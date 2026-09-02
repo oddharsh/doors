@@ -1,0 +1,6 @@
+{
+  "name": "doors",
+  "version": "0.1.0",
+  "description": "Six skills for making a website something an agent can walk into: an audit that grades any origin the way aadhar.sh/lens does, discovery files (llms.txt, sitemap, robots), Markdown twins with correct Accept negotiation, MCP doors with generated cards, shared-dictionary delivery, and IndieWeb (h-card, rel=me, webmentions). Every skill ships a probe with a control first and a reference checklist as the fallback.",
+  "author": { "name": "Aadharsh Pannirselvam" }
+}

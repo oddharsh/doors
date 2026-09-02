@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "doors",
+  "description": "Skills for making a website something an agent can walk into: discovery files, Markdown twins, MCP doors, shared dictionaries, IndieWeb, and an audit that grades any site the way aadhar.sh/lens does. Single-plugin marketplace; the plugin source is the doors/ subfolder.",
+  "owner": { "name": "Aadharsh Pannirselvam", "email": "aadharsh@archetype.fund" },
+  "plugins": [
+    {
+      "name": "doors",
+      "description": "Make a site agent-native and semantic-web native, with probes that can fail rather than checklists that cannot.",
+      "author": { "name": "Aadharsh Pannirselvam", "email": "aadharsh@archetype.fund" },
+      "source": "./doors",
+      "category": "development"
+    }
+  ]
+}
