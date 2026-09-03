@@ -6,6 +6,8 @@ The skills cite files by path rather than vendoring copies, because a copy rots
 silently and a path that stops resolving fails loudly. Paths are pinned to commit
 `3d182c7d4dec1a71634460666d9c6f0fc9e85442` (2026-09-02); a link below is
 `https://github.com/oddharsh/site/blob/3d182c7d4dec1a71634460666d9c6f0fc9e85442/<path>`.
+Rows added with batch two (2026-09-03) resolve at the same commit; where a later
+site PR changed the file, the row says so.
 
 | concern | path | what it is |
 |---|---|---|
@@ -22,3 +24,10 @@ silently and a path that stops resolving fails loudly. Paths are pinned to commi
 | Web Bot Auth | `public/.well-known/http-message-signatures-directory`, the `BOT_NAME` code in `src/worker/` | signing your own crawler per RFC 9421 |
 | IndieWeb | `src/worker/webmention.ts`, `src/worker/webmention-send.ts`, `src/worker/inbox.ts`, `src/pages/index.html` (h-card), `src/worker/writing.ts` (h-entry) | receiving, sending, and moderating webmentions; the microformats on the pages |
 | the long-form record | `CLAUDE.md` (numbered gotchas), `src/pages/garage/*.html` | every measurement and every trap, in prose |
+| the bot-views tier | `src/worker/lens.ts` (`LENS_BOT_VIEWS`, `lensFetchAsBot`), `src/worker/lib/robots.ts` | ten identities with two controls, and the robots parser (`crawler-policy`) |
+| the Web Bot Auth signer | `src/worker/lib/botauth.ts` | RFC 9421 signing of every outbound crawl; `keyid` derivation is what the first `agent-identity` run found wrong (fixed in a later site PR, linked from the skill's recipe once merged) |
+| identity files | `public/.well-known/http-message-signatures-directory`, `public/.well-known/agent-card.json` | the key directory and the agent card |
+| DNS-AID | `config/infra.json` (`dns`), `bun run infra:check` | the `_index._agents` SVCB record declared and diffed against the zone |
+| NLWeb | `src/worker/nlweb.ts`, `src/worker/lens-nlweb.ts` | the `/ask` endpoint and the per-field grader (`nlweb-ask`) |
+| delivery | `src/worker/lib/assets.ts`, `src/worker/lib/shell-assets.ts`, `tools/photos/shell-data.ts`, `tools/build.ts` | q11 twins, the 404 clamp, preload Links, speculation rules, CSP hashes (`wire-weight`) |
+| the wire series | `tools/perf-snapshot.ts`, `.github/workflows/perf-diff.yml`, `.github/workflows/perf-history.yml`, `src/worker/dyno.ts` | per-PR wire diff that gates nothing, and the nightly row `/garage/dyno` charts |

@@ -1,6 +1,8 @@
 {
   "name": "doors",
-  "version": "0.1.0",
-  "description": "Six skills for making a website something an agent can walk into: an audit that grades any origin the way aadhar.sh/lens does, discovery files (llms.txt, sitemap, robots), Markdown twins with correct Accept negotiation, MCP doors with generated cards, shared-dictionary delivery, and IndieWeb (h-card, rel=me, webmentions). Every skill ships a probe with a control first and a reference checklist as the fallback.",
-  "author": { "name": "Aadharsh Pannirselvam" }
+  "version": "0.2.0",
+  "description": "Ten skills for making a website something an agent can walk into: an audit that grades any origin the way aadhar.sh/lens does, discovery files (llms.txt, sitemap, robots), Markdown twins with correct Accept negotiation, MCP doors with generated cards, shared-dictionary delivery, IndieWeb (h-card, rel=me, webmentions), crawler policy read with controls, agent identity (Web Bot Auth, agent card, DNS-AID), NLWeb /ask graded per field, and wire weight (who compressed, immutable assets, Early Hints, speculation, CSP by hash). Every skill ships a probe with a control first and a reference as the fallback.",
+  "author": {
+    "name": "Aadharsh Pannirselvam"
+  }
 }
