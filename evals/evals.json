@@ -2,12 +2,61 @@
   "skill_name": "doors",
   "$comment": "Test prompts for the skill-creator loop, one realistic prompt per skill plus two cross-skill ones. Assertions are added once the first runs exist.",
   "evals": [
-    { "id": 1, "skill": "agent-audit", "prompt": "my blog is at https://example.org (astro on netlify). a friend said AI agents can't find anything on it. can you check what's actually missing before I start adding files everywhere? don't just give me a checklist, tell me what it has today", "expected_output": "Runs the audit probe, reads the two control rows before grading, reports each door with its verdict and detail, maps only the real absences to the right skills, and does not recommend changing robots policy unprompted.", "files": [] },
-    { "id": 2, "skill": "discovery-files", "prompt": "add an llms.txt to this site. the pages are under src/pages/ and there's a sitemap already. make sure everything in it actually resolves, last time I hand-wrote one half the links were dead within a month", "expected_output": "Writes a short root llms.txt with per-section files where a section is large, generates from the page registry if one exists, runs the sweep before and after, and never lists a path that does not answer.", "files": [] },
-    { "id": 3, "skill": "markdown-twins", "prompt": "we added markdown support to our docs site last sprint (Accept: text/markdown returns markdown) but someone using Claude Code says they still get HTML from https://docs.example.com/guide/start. what's going on", "expected_output": "Runs the replay, identifies the equal-q tie that Claude Code, Copilot CLI and Microsoft Copilot send, explains the first-listed tie rule and that */* cannot break a tie, checks the q=0 and q-ranked controls, and proposes the fix in the negotiation code rather than a checklist.", "files": [] },
-    { "id": 4, "skill": "mcp-doors", "prompt": "I put an MCP server at /mcp on my site with 3 tools (one of them edits a record). claude desktop can call it but some other client gets a 400. also I wrote .well-known/mcp/server-card.json by hand. is any of this right?", "expected_output": "Runs the conformance probe, explains the Mcp-Method and dual Accept framing requirements, flags the hand-written card as a drift risk and generates it from tools/list with a test, and checks that the editing tool declares readOnlyHint false while the others default to read-only.", "files": [] },
-    { "id": 5, "skill": "shared-dictionaries", "prompt": "cloudflare says shared dictionaries are in beta now. our site is workers static assets, ~40 pages, same shell on every page. how much would we actually save and what do I have to build? we already precompress with brotli", "expected_output": "Runs the check (expects no offers today), explains the two tiers with the measured ranges, lays out the build order (twins, family dictionary, snapshots rolled from the wire, scoped offers, production check kept advisory), and names the registrability vetoes and the wrong-bytes corpus trap.", "files": [] },
-    { "id": 6, "skill": "indieweb", "prompt": "want my personal site to work with the indieweb: people should be able to reply from their own blogs and mastodon should show the verified checkmark for my profile link. site is at https://me.example.com, posts under /posts/", "expected_output": "Runs the check on the homepage and one post, adds an h-card on the visible name/link, two-way rel=me, a webmention endpoint advertised on every mentionable page with verify-then-moderate receiving, and h-entry on posts; leaves IndieAuth off until needed.", "files": [] },
-    { "id": 7, "skill": "cross", "prompt": "make https://example.org agent-native. it's a hugo site, I have an afternoon.", "expected_output": "Audits first, then works the absences in order of value with the matching skills, re-runs the audit at the end, and reports the before/after door count rather than a list of things done.", "files": [] }
+    {
+      "id": 1,
+      "skill": "agent-audit",
+      "prompt": "my blog is at https://example.org (astro on netlify). a friend said AI agents can't find anything on it. can you check what's actually missing before I start adding files everywhere? don't just give me a checklist, tell me what it has today",
+      "expected_output": "Runs the audit probe, reads the two control rows before grading, reports each door with its verdict and detail, maps only the real absences to the right skills, and does not recommend changing robots policy unprompted.",
+      "files": [],
+      "known_state": "IANA's example.org: no llms.txt, no agent card, no MCP, no markdown negotiation. The audit's controls pass (the site answers a browser and curl), so the zero is a real zero, and the right recommendation is a short list of doors in value order rather than everything at once."
+    },
+    {
+      "id": 2,
+      "skill": "discovery-files",
+      "prompt": "add an llms.txt to this site. the pages are under src/pages/ and there's a sitemap already. make sure everything in it actually resolves, last time I hand-wrote one half the links were dead within a month. the site is https://aadhar.sh",
+      "expected_output": "Writes a short root llms.txt with per-section files where a section is large, generates from the page registry if one exists, runs the sweep before and after, and never lists a path that does not answer.",
+      "files": [],
+      "known_state": "aadhar.sh publishes a root llms.txt, two section indexes and a sitemap. After site PR #714 every advertised URL should answer; before it, /garage/dyno.md was the one 404. The sweep is the instrument either way."
+    },
+    {
+      "id": 3,
+      "skill": "markdown-twins",
+      "prompt": "we added markdown support to our docs site last sprint (Accept: text/markdown returns markdown) but someone using Claude Code says they still get HTML from https://developers.cloudflare.com/fundamentals/. what's going on",
+      "expected_output": "Runs the replay, identifies the equal-q tie that Claude Code, Copilot CLI and Microsoft Copilot send, explains the first-listed tie rule and that */* cannot break a tie, checks the q=0 and q-ranked controls, and proposes the fix in the negotiation code rather than a checklist.",
+      "files": [],
+      "known_state": "Cloudflare's docs negotiate Markdown for all seven agent clients (7 of 7 measured 2026-09-02, about 30x smaller decoded). The replay should show that, and the answer to 'Claude Code still gets HTML' must be tested against the URL the user gave, since the tie rule is per-origin."
+    },
+    {
+      "id": 4,
+      "skill": "mcp-doors",
+      "prompt": "I put an MCP server at /mcp on my site with 3 tools (one of them edits a record). claude desktop can call it but some other client gets a 400. also I wrote .well-known/mcp/server-card.json by hand. is any of this right?. the site is https://aadhar.sh/mcp",
+      "expected_output": "Runs the conformance probe, explains the Mcp-Method and dual Accept framing requirements, flags the hand-written card as a drift risk and generates it from tools/list with a test, and checks that the editing tool declares readOnlyHint false while the others default to read-only.",
+      "files": [],
+      "known_state": "aadhar.sh serves a dual-era MCP server at /mcp with 25 tools, 2 of which write (representation_capture, representation_compare), and a generated server card that matches tools/list. The conformance probe should report modern era, the header requirements, and the card as in sync."
+    },
+    {
+      "id": 5,
+      "skill": "shared-dictionaries",
+      "prompt": "cloudflare says shared dictionaries are in beta now. our site is workers static assets, ~40 pages, same shell on every page. how much would we actually save and what do I have to build? we already precompress with brotli. the site is https://aadhar.sh",
+      "expected_output": "Runs the check (expects no offers today), explains the two tiers with the measured ranges, lays out the build order (twins, family dictionary, snapshots rolled from the wire, scoped offers, production check kept advisory), and names the registrability vetoes and the wrong-bytes corpus trap.",
+      "files": [],
+      "known_state": "aadhar.sh ships both dictionary tiers: a family dictionary offered in the Link header and per-page snapshots. The check should decode the homepage dcz against the family dictionary byte-identical (about 4x under plain brotli) and its wrong-hash control should come back plain."
+    },
+    {
+      "id": 6,
+      "skill": "indieweb",
+      "prompt": "want my personal site to work with the indieweb: people should be able to reply from their own blogs and mastodon should show the verified checkmark for my profile link. site is at https://aadhar.sh, posts under /posts/",
+      "expected_output": "Runs the check on the homepage and one post, adds an h-card on the visible name/link, two-way rel=me, a webmention endpoint advertised on every mentionable page with verify-then-moderate receiving, and h-entry on posts; leaves IndieAuth off until needed.",
+      "files": [],
+      "known_state": "aadhar.sh has an h-card and 13 rel=me links on the homepage; the webmention endpoint is advertised on posts but not the homepage, and posts carry no h-entry. Those two absences are the work."
+    },
+    {
+      "id": 7,
+      "skill": "cross",
+      "prompt": "make https://example.org agent-native. it's a hugo site, I have an afternoon.",
+      "expected_output": "Audits first, then works the absences in order of value with the matching skills, re-runs the audit at the end, and reports the before/after door count rather than a list of things done.",
+      "files": [],
+      "known_state": "Same origin as eval 1. The cross-skill run should audit, work the absences in value order, and re-audit, reporting a before and after count."
+    }
   ]
 }
