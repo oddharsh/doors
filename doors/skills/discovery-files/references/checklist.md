@@ -40,3 +40,20 @@ Never advertise a door you do not serve. A dangling entry passes a scanner and
 breaks the first agent that follows it, which is worse than the entry missing.
 The reference site publishes DNS-AID's `_index` record and deliberately not
 `_a2a`, because it has no Agent2Agent server, for exactly this reason.
+
+## Field note: the first thing the sweep caught
+
+Run against the reference site on 2026-09-02, the sweep reported one broken
+advertised URL: `/garage/llms.txt` promised `/garage/dyno.md`, which answered
+404. The page is Worker-rendered from a data branch, so no source walk could
+produce its twin, and the section index linked every registered surface as
+`<path>.md` regardless. Nothing in that repository's own checks could see it,
+because the index is built from the page registry and the twins from the tree,
+and no assertion joined the two.
+
+The fix ([oddharsh/site#714](https://github.com/oddharsh/site/pull/714)) is the
+pattern to copy when you generate an index: pass the generator the set of files
+the build actually holds, list anything outside it under its HTML URL with a
+heading that says so, and pin the join with a test whose control hands the
+generator an empty set and expects it to promise nothing. A generator that
+links by registration alone is the shape this sweep exists to catch.
