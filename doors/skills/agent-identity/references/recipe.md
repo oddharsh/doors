@@ -52,9 +52,10 @@ First run of `identity.mjs` against aadhar.sh, 2026-09-03: one Ed25519 key,
 served as `application/jwk-set+json`. Every earlier check of that directory
 (the site's own audit included) asserted presence and a `keys` array, and all of
 them passed. The signer took `keyid` from the same typed field, so the two
-agreed with each other and with no verifier. The fix derives `keyid` from the
-public members and pins the directory's kid to the thumbprint in a test; the PR
-is linked from `site-paths.md` once merged.
+agreed with each other and with no verifier. The fix ([oddharsh/site#716](https://github.com/oddharsh/site/pull/716))
+derives `keyid` from the public members at signing time, sets the directory's
+kid to the thumbprint, serves the draft's media type, and pins all three in a
+test whose control is RFC 8037's published vector.
 
 The general shape: a check that asserts a file EXISTS cannot see that the file
 is wrong in the one way the consumer cares about. Grade the property the

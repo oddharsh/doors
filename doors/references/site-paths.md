@@ -25,7 +25,7 @@ site PR changed the file, the row says so.
 | IndieWeb | `src/worker/webmention.ts`, `src/worker/webmention-send.ts`, `src/worker/inbox.ts`, `src/pages/index.html` (h-card), `src/worker/writing.ts` (h-entry) | receiving, sending, and moderating webmentions; the microformats on the pages |
 | the long-form record | `CLAUDE.md` (numbered gotchas), `src/pages/garage/*.html` | every measurement and every trap, in prose |
 | the bot-views tier | `src/worker/lens.ts` (`LENS_BOT_VIEWS`, `lensFetchAsBot`), `src/worker/lib/robots.ts` | ten identities with two controls, and the robots parser (`crawler-policy`) |
-| the Web Bot Auth signer | `src/worker/lib/botauth.ts` | RFC 9421 signing of every outbound crawl; `keyid` derivation is what the first `agent-identity` run found wrong (fixed in a later site PR, linked from the skill's recipe once merged) |
+| the Web Bot Auth signer | `src/worker/lib/botauth.ts` | RFC 9421 signing of every outbound crawl; `keyid` derivation is what the first `agent-identity` run found wrong; fixed in [oddharsh/site#716](https://github.com/oddharsh/site/pull/716) |
 | identity files | `public/.well-known/http-message-signatures-directory`, `public/.well-known/agent-card.json` | the key directory and the agent card |
 | DNS-AID | `config/infra.json` (`dns`), `bun run infra:check` | the `_index._agents` SVCB record declared and diffed against the zone |
 | NLWeb | `src/worker/nlweb.ts`, `src/worker/lens-nlweb.ts` | the `/ask` endpoint and the per-field grader (`nlweb-ask`) |
