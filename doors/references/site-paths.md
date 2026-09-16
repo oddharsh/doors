@@ -7,7 +7,10 @@ silently and a path that stops resolving fails loudly. Paths are pinned to commi
 `3d182c7d4dec1a71634460666d9c6f0fc9e85442` (2026-09-02); a link below is
 `https://github.com/oddharsh/site/blob/3d182c7d4dec1a71634460666d9c6f0fc9e85442/<path>`.
 Rows added with batch two (2026-09-03) resolve at the same commit; where a later
-site PR changed the file, the row says so.
+site PR changed the file, the row says so. Rows added with batch three
+(2026-09-16: `agent-auth`, `skills-index`, `agent-commerce`, `agent-readiness`)
+resolve at `961ca31f988e30d319040085a0822ec5e87f6fb0`, which is where the
+`.well-known/` documents and `agent.ts` were read.
 
 | concern | path | what it is |
 |---|---|---|
@@ -31,3 +34,8 @@ site PR changed the file, the row says so.
 | NLWeb | `src/worker/nlweb.ts`, `src/worker/lens-nlweb.ts` | the `/ask` endpoint and the per-field grader (`nlweb-ask`) |
 | delivery | `src/worker/lib/assets.ts`, `src/worker/lib/shell-assets.ts`, `tools/photos/shell-data.ts`, `tools/build.ts` | q11 twins, the 404 clamp, preload Links, speculation rules, CSP hashes (`wire-weight`) |
 | the wire series | `tools/perf-snapshot.ts`, `.github/workflows/perf-diff.yml`, `.github/workflows/perf-history.yml`, `src/worker/dyno.ts` | per-PR wire diff that gates nothing, and the nightly row `/garage/dyno` charts |
+| the OAuth chain | `public/.well-known/oauth-authorization-server`, `public/.well-known/oauth-protected-resource`, `src/content/auth.md`, `src/worker/agent.ts` | RFC 8414 + RFC 9728 metadata with the Auth.md `agent_auth` block, and the anonymous registration handler at `/agent/auth` (`agent-auth`) |
+| the skills index | `public/.well-known/agent-skills/index.json`, `public/.well-known/agent-skills/serendipity-events/SKILL.md` | one site skill with a verified digest (`skills-index`) |
+| the x402 gate | `src/worker/x402.ts` | the `/llms-full.txt` paywall: v1 `accepts` envelope, facilitator verify-and-settle, and the `x-payment-note` degrade while the wallet is unset (`agent-commerce`) |
+| the readiness frame | `src/worker/agent-ready.ts` | the `agent_ready` MCP tool and `/terminal` frame: five doors counted, never scored, with "could not check" as a third state (`agent-readiness`) |
+| ARD | `public/.well-known/ard.json`, `public/.well-known/ai-catalog.json` | the manifest and its byte-identical alias, `urn:air:` entries with representative queries (`agent-readiness`) |
