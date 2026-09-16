@@ -29,6 +29,11 @@ records what it checks and where doors measures differently.
 
 For a store: `node doors/skills/agent-readiness/scripts/ladder.mjs https://store.example --profile commerce --reference`.
 
+`evals/corpus.json` is 29 live origins the probes learned from, each with what
+it teaches and a recorded expectation; `node evals/corpus.mjs --expect` runs the
+commerce, auth and skills probes over all of them in about ten seconds and exits
+1 on drift.
+
 ## Install
 
 ```

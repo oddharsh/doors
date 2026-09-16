@@ -120,47 +120,79 @@ async function readAp2(origin) {
   return { verdict: "yes", detail: `agent card declares ${ap2[0].uri}${ap2[0].required ? " (required)" : ""}`, card: d.name || null, uri: ap2[0].uri, required: Boolean(ap2[0].required), otherExtensions: others };
 }
 
-// Candidate paths for the 402 knock: what the origin itself advertises, then the conventional ones.
-async function candidatePaths(origin, openapi) {
-  const paths = new Set(["/", "/api", "/api/v1", "/llms-full.txt", ...extraPaths]);
+// Candidate paths for the 402 knock, in the order they are worth knocking: operations a discovery document prices, routes the
+// homepage documents (an MPP service's front page is usually its API reference: "POST /fetch"), api-catalog anchors, then the conventional
+// four and --paths. Capped at 24; a scanner that knocks three fixed paths reported live sellers as "not detected" on 2026-09-16.
+function openapiPaths(doc, base = "") {
+  const out = []; if (!doc?.paths) return out;
+  for (const [p, ops] of Object.entries(doc.paths)) { const paid = ops && Object.values(ops).some((x) => x && (x["x-payment-info"] || x.responses?.["402"])); out.push({ path: (base + p).replace(/\{[^}]+\}/g, "1").replace(/:[A-Za-z_]+/g, "1"), paid, ops }); }
+  return out;
+}
+async function candidatePaths(origin, home, openapis) {
+  const paid = []; const plain = [];
+  for (const o of openapis) for (const r of openapiPaths(o.doc, o.base)) (r.paid ? paid : plain).push(r.path);
+  const text = home.text || "";
+  const mentioned = [...new Set([...text.replace(/<[^>]+>/g, " ").matchAll(/\b(?:GET|POST|PUT|DELETE)\s+(\/[\w./:{}-]{1,80})/g)].map((m) => m[1].replace(/\{[^}]+\}/g, "1").replace(/:[A-Za-z_]+/g, "1")))];
   const cat = await req(origin + "/.well-known/api-catalog", { accept: "application/linkset+json, application/json;q=0.9" }); const ls = cat.status === 200 ? json(cat.text) : null;
-  for (const l of ls?.linkset || []) if (l.anchor && sameOrigin(l.anchor, origin)) { try { paths.add(new URL(l.anchor, origin).pathname); } catch {} }
-  for (const [p, ops] of Object.entries(openapi?.paths || {})) { const o = Object.values(ops || {}).find((x) => x && typeof x === "object"); if (ops && (Object.values(ops).some((x) => x && x["x-payment-info"]) || Object.values(ops).some((x) => x?.responses?.["402"]))) paths.add(p.replace(/\{[^}]+\}/g, "1")); else if (o && paths.size < 12) paths.add(p.replace(/\{[^}]+\}/g, "1")); }
-  return [...paths].slice(0, 16);
+  const anchors = []; for (const l of ls?.linkset || []) if (l.anchor && sameOrigin(l.anchor, origin)) { try { anchors.push(new URL(l.anchor, origin).pathname); } catch {} }
+  const ordered = [...paid, ...extraPaths, ...mentioned, ...anchors, "/", "/api", "/api/v1", "/llms-full.txt", ...plain];
+  return [...new Set(ordered.filter((p) => p.startsWith("/") && !/\.(png|jpg|css|js|svg|ico|woff2?)$/i.test(p)))].slice(0, 24);
 }
 
-async function readOpenapi(origin) {
-  for (const p of ["/openapi.json", "/.well-known/openapi.json", "/openapi.yaml"]) { const r = await req(origin + p, { accept: "application/json, application/yaml;q=0.8, */*;q=0.1" }); if (r.status === 200 && !isHtml(r.text)) { const d = json(r.text); if (d && (d.openapi || d.swagger)) return { path: p, doc: d }; if (/^openapi:/m.test(r.text)) return { path: p, doc: null, yaml: true }; } }
-  return null;
+async function readOpenapis(origin, home) {
+  const found = []; const seen = new Set();
+  // Links in href attributes AND bare mentions in the page text: an API marketplace's front page is often rendered Markdown naming "/agentmail/openapi.json" in prose (mpp.orthogonal.com, 2026-09-16).
+  const text = home.text || "";
+  const linked = [...new Set([...text.matchAll(/href=["']?([^"' >]*openapi[^"' >]*)/gi), ...text.matchAll(/[("'\s]((?:https?:\/\/[\w.-]+)?\/[\w./-]*openapi(?:\.json|\.yaml)?)(?=[)"'\s<])/gi)].map((m) => { try { return new URL(m[1], origin).href; } catch { return null; } }).filter((u) => u && sameOrigin(u, origin)))].slice(0, 6);
+  for (const u of ["/openapi.json", "/.well-known/openapi.json", "/openapi.yaml", "/openapi"].map((p) => origin + p).concat(linked)) {
+    if (seen.has(u)) continue; seen.add(u);
+    const r = await req(u, { accept: "application/json, application/yaml;q=0.8, */*;q=0.1" }); if (r.status !== 200 || isHtml(r.text)) continue;
+    const d = json(r.text);
+    if (d && (d.openapi || d.swagger)) { let base = ""; try { const sv = d.servers?.[0]?.url; if (sv && sameOrigin(sv, origin)) base = new URL(sv, origin).pathname.replace(/\/$/, ""); } catch {} found.push({ path: u.replace(origin, ""), doc: d, base }); }
+    else if (/^openapi:/m.test(r.text)) found.push({ path: u.replace(origin, ""), doc: null, yaml: true });
+  }
+  return found;
 }
 
-async function knock402(origin, paths, openapi) {
-  const rows = await Promise.all(paths.map(async (p) => {
-    const ops = openapi?.doc?.paths?.[p] || {}; const method = ops.get ? "GET" : ops.post ? "POST" : "GET";
+// Three at a time, and stop after three 429s in a row: a paid API rate-limits strangers, and 24 parallel knocks read as an attack and come back as 24 unknowns (api.nansen.ai answered 20 of 24 with 429 on the first run).
+async function knock402(origin, paths, openapis) {
+  const opsFor = (p) => { for (const o of openapis) for (const r of openapiPaths(o.doc, o.base)) if (r.path === p) return r.ops || {}; return {}; };
+  const rows = []; let i = 0; let limited = 0; let stopped = false;
+  const worker = async () => { while (i < paths.length && !stopped) { const p = paths[i++];
+    const ops = opsFor(p); const method = ops.get ? "GET" : ops.post ? "POST" : "GET";
     const r = await req(origin + p, { method, accept: "application/json, */*;q=0.5", body: method === "POST" ? "{}" : undefined, headers: method === "POST" ? { "content-type": "application/json" } : {} });
-    return { path: p, method, status: r.status || r.error, dialects: classify402(r.status, r.headers, r.text), note: r.headers.get("x-payment-note") || null };
-  }));
+    if (r.status === 429) { if (++limited >= 3) stopped = true; } else limited = 0;
+    rows.push({ path: p, method, status: r.status || r.error, dialects: classify402(r.status, r.headers, r.text), note: r.headers.get("x-payment-note") || null }); } };
+  await Promise.all([worker(), worker(), worker()]);
+  rows.rateLimited = rows.filter((r) => r.status === 429).length; rows.stopped = stopped; rows.unknocked = paths.length - rows.length;
   return rows;
 }
 
-function readMppDiscovery(openapi) {
-  if (!openapi) return { advertised: [], problems: ["no /openapi.json (MPP discovery is an OpenAPI 3.1 document with x-payment-info on paid operations)"] };
-  if (openapi.yaml) return { advertised: [], problems: [`${openapi.path} is YAML; this probe reads JSON only, and mppx emits JSON`] };
+function readMppDiscovery(openapis) {
+  if (!openapis.length) return { advertised: [], problems: ["no /openapi.json (MPP discovery is an OpenAPI 3.1 document with x-payment-info on paid operations)"] };
   const advertised = []; const problems = []; const shapes = new Set(); const alsoX402 = new Set();
-  for (const [p, ops] of Object.entries(openapi.doc.paths || {})) for (const [m, op] of Object.entries(ops || {})) {
+  for (const openapi of openapis) { if (openapi.yaml) { problems.push(`${openapi.path} is YAML; this probe reads JSON only, and mppx emits JSON`); continue; }
+  for (const [p0, ops] of Object.entries(openapi.doc.paths || {})) for (const [m, op] of Object.entries(ops || {})) { const p = (openapi.base || "") + p0;
     const info = op && op["x-payment-info"]; if (!info) continue;
     // Three shapes in the wild: canonical offers[], the flat single-offer shorthand, and a multi-protocol form ({price, protocols:[{x402},{mpp:{...}}]}) that some x402+MPP sellers emit. The third is read for what it says and flagged, since a canonical MPP client will not parse it.
     let offers; let shape = "offers";
-    if (Array.isArray(info.offers)) { offers = info.offers; if (["amount", "currency", "intent", "method"].some((k) => k in info)) problems.push(`${m.toUpperCase()} ${p}: offers[] cannot be combined with the flat fields`); }
-    else if (Array.isArray(info.protocols)) { shape = "protocols"; offers = info.protocols.filter((x) => x && x.mpp).map((x) => ({ ...x.mpp, amount: x.mpp.amount ?? info.price?.amount ?? null, currency: x.mpp.currency ?? info.price?.currency })); if (info.protocols.some((x) => x && "x402" in x)) alsoX402.add(`${m.toUpperCase()} ${p}`); if (!offers.length) continue; }
+    if (Array.isArray(info.offers)) { offers = info.offers; if (["amount", "currency", "intent", "method"].some((k) => k in info)) problems.push(`${m.toUpperCase()} ${p}: offers[] cannot be combined with the flat fields`);
+      // A marketplace variant: `method` names the PROTOCOL (mpp, x402), `rail` names the payment method, and `price` sits at the top as a number (mpp.orthogonal.com, 2026-09-16).
+      if (offers.some((o) => o && ["mpp", "x402"].includes(o.method) && "rail" in o)) { shape = "protocol-as-method"; offers = offers.filter((o) => o.method === "mpp").map((o) => ({ intent: o.intent, method: o.rail, currency: o.currency, amount: o.amount ?? (info.price != null ? String(info.price) : null) })); if (info.offers.some((o) => o.method === "x402")) alsoX402.add(`${m.toUpperCase()} ${p}`); if (!offers.length) continue; } }
+    else if (Array.isArray(info.protocols)) { // entries are objects ({mpp:{...}}) on some sellers and bare strings ("mpp") on others
+      shape = "protocols"; const names = info.protocols.map((x) => (typeof x === "string" ? x : x && typeof x === "object" ? Object.keys(x)[0] : null));
+      const price = typeof info.price === "object" && info.price ? info.price : { amount: info.price ?? null, currency: null };
+      offers = info.protocols.filter((x, i) => names[i] === "mpp").map((x) => { const o = typeof x === "object" && x.mpp && typeof x.mpp === "object" ? x.mpp : {}; return { ...o, amount: o.amount ?? price.amount ?? null, currency: o.currency ?? price.currency ?? null, intent: o.intent ?? null, method: o.method ?? null }; });
+      if (names.includes("x402")) alsoX402.add(`${m.toUpperCase()} ${p}`); if (!offers.length) continue; }
     else { shape = "flat"; offers = [info]; }
     if (shape !== "offers") shapes.add(shape);
-    for (const o of offers) { const bad = []; if (!["charge", "session"].includes(o.intent)) bad.push("intent"); if (typeof o.method !== "string") bad.push("method"); if (!("amount" in o)) bad.push("amount"); if (typeof o.currency !== "string") bad.push("currency"); if (bad.length) problems.push(`${m.toUpperCase()} ${p}: offer missing or malformed ${bad.join(", ")}`); }
+    if (shape === "offers" || shape === "flat") for (const o of offers) { const bad = []; if (!["charge", "session"].includes(o.intent)) bad.push("intent"); if (typeof o.method !== "string") bad.push("method"); if (!("amount" in o)) bad.push("amount"); if (typeof o.currency !== "string") bad.push("currency"); if (bad.length) problems.push(`${m.toUpperCase()} ${p}: offer missing or malformed ${bad.join(", ")}`); }
     advertised.push({ method: m.toUpperCase(), path: p, offers: offers.map((o) => ({ intent: o.intent, method: o.method, amount: o.amount, currency: o.currency })) });
-  }
+  } }
   if (shapes.has("protocols")) problems.unshift(`x-payment-info uses the multi-protocol {price, protocols[]} shape on ${advertised.length} operation(s) rather than offers[]; a canonical MPP discovery client reads none of them`);
+  if (shapes.has("protocol-as-method")) problems.unshift(`x-payment-info.offers[] name the protocol in \`method\` and the payment method in \`rail\`, with \`price\` at the top, on ${advertised.length} operation(s); canonical offers[] put the payment method in \`method\` and a base-unit string in \`amount\``);
   if (shapes.has("flat")) problems.unshift("x-payment-info uses the flat single-offer shorthand; new documents should write offers[]");
-  return { advertised, problems, serviceInfo: openapi.doc["x-service-info"] || null, shapes: [...shapes], alsoX402: [...alsoX402] };
+  return { advertised, problems, serviceInfo: openapis.find((o) => o.doc)?.doc?.["x-service-info"] || null, shapes: [...shapes], alsoX402: [...alsoX402], documents: openapis.map((o) => o.path) };
 }
 
 // Commerce signals: is there anything here to buy? Bounded and cheap; a signal is evidence, never a verdict on its own.
@@ -175,7 +207,8 @@ async function commerceSignals(origin, home) {
   if (/priceCurrency|"price"\s*:/.test(t)) s.add("schema:price");
   if (/href="\/?(cart|checkout|basket)\b/i.test(t) || /add[-_ ]to[-_ ]cart/i.test(t)) s.add("html:cart");
   if (/apple-pay|ApplePaySession/i.test(t)) s.add("payment:apple-pay"); if (/paypal/i.test(t)) s.add("payment:paypal"); if (/js\.stripe\.com|stripe\.js/i.test(t)) s.add("payment:stripe"); if (/pay\.google\.com|google-pay/i.test(t)) s.add("payment:google-pay");
-  const [apple, products, wc] = await Promise.all([head(origin + "/.well-known/apple-developer-merchantid-domain-association"), req(origin + "/products.json"), req(origin + "/wp-json/wc/store/v1/products")]);
+  const [apple, products, wc, cart] = await Promise.all([head(origin + "/.well-known/apple-developer-merchantid-domain-association"), req(origin + "/products.json"), req(origin + "/wp-json/wc/store/v1/products"), req(origin + "/cart", { accept: "text/html, */*;q=0.5" })]);
+  if (cart.status === 200 && isHtml(cart.text) && /cart|basket|bag/i.test(cart.text.slice(0, 20000))) s.add("path:/cart");
   if (apple === 200) s.add("file:apple-pay-merchant-association");
   if (products.status === 200 && json(products.text)?.products) s.add("api:shopify-products.json");
   if (wc.status === 200 && Array.isArray(json(wc.text))) s.add("api:woocommerce-store");
@@ -184,34 +217,48 @@ async function commerceSignals(origin, home) {
 }
 
 async function scan(origin) {
-  const [home, ghost, openapi] = await Promise.all([req(origin + "/", { accept: "text/html, */*;q=0.5" }), req(`${origin}/.well-known/commerce-ghost-${Date.now().toString(36)}`), readOpenapi(origin)]);
+  const [home, ghost] = await Promise.all([req(origin + "/", { accept: "text/html, */*;q=0.5" }), req(`${origin}/.well-known/commerce-ghost-${Date.now().toString(36)}`)]);
   const catchAll = ghost.status === 200 && isHtml(ghost.text);
-  const [commerce, ucp, acp, ap2, paths] = await Promise.all([commerceSignals(origin, home), readUcp(origin), readAcp(origin), readAp2(origin), candidatePaths(origin, openapi?.doc)]);
-  const knocks = await knock402(origin, paths, openapi);
+  // The control that matters most: if / does not answer this identity, every "absent" below is the wall, and the doors are unknown rather than shut.
+  const challenge = home.status === 200 && /(captcha|challenge-platform|cf-chl|access denied|verify you are human|px-captcha|_Incapsula_|datadome)/i.test(home.text.slice(0, 4000));
+  // A 404 at / is an API host with no homepage (api.exa.ai, api.bitrefill.com), which is measurable; a wall is a refusal (0, 401, 403, 429, 5xx) or a challenge page.
+  const measurable = home.status > 0 && ![401, 403, 429].includes(home.status) && home.status < 500 && !challenge;
+  const wall = measurable ? null : `GET / as this probe: ${home.status === 0 ? home.error : challenge ? "200 with a bot-check page" : `HTTP ${home.status}`}`;
+  if (!measurable) { const u = (why) => ({ verdict: "unknown", detail: why, routes: [], challenges: [], advertised: [], problems: [] });
+    return { origin, probe: UA, controls: { home: `FAIL: ${wall}; this origin refuses the instrument and nothing below is a measurement`, ghost: catchAll ? "FAIL: catch-all" : `pass: ${ghost.status || ghost.error}` }, measurable: false, commerce: { verdict: "unknown", signals: [] }, doors: { ucp: u(wall), acp: u(wall), x402: u(wall), mpp: u(wall), ap2: u(wall) }, knocked: [], payPerCrawl: [], unknown402: [], openapi: [], open: 0, of: 5 }; }
+  const openapis = await readOpenapis(origin, home);
+  const [commerce, ucp, acp, ap2, paths] = await Promise.all([commerceSignals(origin, home), readUcp(origin), readAcp(origin), readAp2(origin), candidatePaths(origin, home, openapis)]);
+  const knocks = await knock402(origin, paths, openapis);
   const rowsFor = (proto) => knocks.filter((k) => k.dialects.some((d) => d.protocol === proto)).map((k) => ({ ...k, dialect: k.dialects.find((d) => d.protocol === proto) }));
   const x402Rows = rowsFor("x402"); const mppRows = rowsFor("mpp"); const ppc = rowsFor("pay-per-crawl"); const odd = rowsFor("unknown-402");
   const dormant = knocks.filter((k) => k.note);
-  const mppDisc = readMppDiscovery(openapi);
+  const mppDisc = readMppDiscovery(openapis);
   // Discovery is advisory and the Challenge is authoritative (mpp.dev/advanced/discovery), so an advertised price whose route answers 200 without payment is a document describing a gate that is not there.
-  const advertisedButOpen = mppDisc.advertised.filter((a) => { const k = knocks.find((r) => r.path === a.path.replace(/\{[^}]+\}/g, "1")); return k && k.status === 200; }).map((a) => `${a.method} ${a.path}`);
+  const knockOf = (a) => knocks.find((r) => r.path === a.path.replace(/\{[^}]+\}/g, "1").replace(/:[A-Za-z_]+/g, "1"));
+  const advertisedButOpen = mppDisc.advertised.filter((a) => knockOf(a)?.status === 200).map((a) => `${a.method} ${a.path}`);
+  // MPP allows a 401 before the 402 ("authentication first, then an incremental 402"), so an advertised route answering 401 is a door behind a login rather than a missing gate.
+  const authFirst = mppDisc.advertised.filter((a) => knockOf(a)?.status === 401).map((a) => `${a.method} ${a.path}`);
   const x402 = x402Rows.length ? { verdict: "yes", detail: `${x402Rows.length} route${x402Rows.length === 1 ? "" : "s"} answer 402 in x402 v${x402Rows[0].dialect.version} (${x402Rows[0].dialect.carrier}): ${x402Rows.map((r) => r.path).join(", ")}`, routes: x402Rows.map((r) => ({ path: r.path, version: r.dialect.version, accepts: r.dialect.accepts })) }
     : dormant.length ? { verdict: "maybe", detail: `${dormant[0].path} carries x-payment-note "${dormant[0].note}": a gate exists and is not configured`, routes: [] }
     : { verdict: "no", detail: `no 402 in an x402 dialect on ${knocks.length} candidate route${knocks.length === 1 ? "" : "s"}`, routes: [] };
-  const mpp = mppRows.length || mppDisc.advertised.length ? { verdict: mppRows.length ? "yes" : "likely", detail: `${mppRows.length} route${mppRows.length === 1 ? "" : "s"} challenge with WWW-Authenticate: Payment${mppDisc.advertised.length ? `; ${openapi.path} advertises ${mppDisc.advertised.length} paid operation${mppDisc.advertised.length === 1 ? "" : "s"}` : "; no discovery document"}${advertisedButOpen.length ? `; ${advertisedButOpen.length} advertised route(s) answer 200 without payment` : ""}${mppDisc.problems.length ? `; ${mppDisc.problems.length} discovery problem(s)` : ""}`, challenges: mppRows.map((r) => ({ path: r.path, ...r.dialect })), advertised: mppDisc.advertised, advertisedButOpen, problems: mppDisc.problems, serviceInfo: mppDisc.serviceInfo }
-    : { verdict: "no", detail: `no Payment challenge and no x-payment-info in ${openapi ? openapi.path : "an openapi.json (absent)"}`, challenges: [], advertised: [], problems: mppDisc.problems };
+  const mpp = mppRows.length || mppDisc.advertised.length ? { verdict: mppRows.length ? "yes" : "likely", detail: `${mppRows.length} route${mppRows.length === 1 ? "" : "s"} challenge with WWW-Authenticate: Payment${mppDisc.advertised.length ? `; ${mppDisc.documents.join(", ")} advertises ${mppDisc.advertised.length} paid operation${mppDisc.advertised.length === 1 ? "" : "s"}` : "; no discovery document"}${advertisedButOpen.length ? `; ${advertisedButOpen.length} advertised route(s) answer 200 without payment` : ""}${authFirst.length ? `; ${authFirst.length} advertised route(s) answer 401 (authentication before payment)` : ""}${mppDisc.problems.length ? `; ${mppDisc.problems.length} discovery problem(s)` : ""}`, challenges: mppRows.map((r) => ({ path: r.path, ...r.dialect })), advertised: mppDisc.advertised, advertisedButOpen, authFirst, problems: mppDisc.problems, serviceInfo: mppDisc.serviceInfo, documents: mppDisc.documents }
+    : { verdict: "no", detail: `no Payment challenge on ${knocks.length} route(s) and no x-payment-info in ${openapis.length ? openapis.map((o) => o.path).join(", ") : "an openapi.json (absent)"}`, challenges: [], advertised: [], problems: mppDisc.problems };
   // A seller of API calls has no cart and no product schema; an open x402 or MPP door is itself the commerce signal.
   if (x402.verdict === "yes") commerce.signals.push("protocol:x402"); if (mpp.verdict === "yes") commerce.signals.push("protocol:mpp"); if (ucp.verdict !== "no") commerce.signals.push("protocol:ucp"); if (acp.verdict !== "no") commerce.signals.push("protocol:acp");
   if (commerce.signals.some((x) => x.startsWith("protocol:"))) commerce.verdict = "yes";
-  const out = { origin, probe: UA, controls: { ghost: catchAll ? "FAIL: a well-known path that cannot exist answered 200 HTML; only JSON that parses is counted" : `pass: an absent well-known path answers ${ghost.status || ghost.error}` }, commerce, doors: { ucp, acp, x402, mpp, ap2 }, knocked: knocks.map((k) => ({ path: k.path, method: k.method, status: k.status, dialects: k.dialects.map((d) => d.protocol) })), payPerCrawl: ppc.map((r) => ({ path: r.path, price: r.dialect.price })), unknown402: odd.map((r) => r.path), openapi: openapi ? openapi.path : null };
+  const knocking = knocks.stopped ? `stopped after repeated 429s: ${knocks.rateLimited} rate-limited, ${knocks.unknocked} not knocked` : knocks.rateLimited ? `${knocks.rateLimited} route(s) answered 429` : null;
+  const out = { origin, probe: UA, measurable: true, knocking, controls: { home: `pass: GET / answers ${home.status}`, ghost: catchAll ? "FAIL: a well-known path that cannot exist answered 200 HTML; only JSON that parses is counted" : `pass: an absent well-known path answers ${ghost.status || ghost.error}` }, commerce, doors: { ucp, acp, x402, mpp, ap2 }, knocked: knocks.map((k) => ({ path: k.path, method: k.method, status: k.status, dialects: k.dialects.map((d) => d.protocol) })), payPerCrawl: ppc.map((r) => ({ path: r.path, price: r.dialect.price })), unknown402: odd.map((r) => r.path), openapi: openapis.map((o) => o.path) };
   const open = Object.values(out.doors).filter((d) => d.verdict === "yes").length; out.open = open; out.of = 5;
   return out;
 }
 
 function print(out) {
   console.log(`${out.origin}\n`);
-  console.log(`  control     ${out.controls.ghost}`);
+  console.log(`  control     ${out.controls.home}\n              ${out.controls.ghost}`);
+  if (out.measurable === false) { console.log(`\n  every door  unknown: ${out.doors.ucp.detail}`); return; }
   console.log(`  commerce    ${out.commerce.verdict}${out.commerce.signals.length ? `: ${out.commerce.signals.join(", ")}` : " (no platform, catalog, cart or payment signal on the homepage)"}\n`);
   for (const [name, d] of Object.entries(out.doors)) { console.log(`  ${name.padEnd(6)} ${d.verdict.padEnd(7)} ${d.detail}`); const ps = [...new Set(d.problems || [])]; for (const p of ps.slice(0, 6)) console.log(`                 ! ${p}`); if (ps.length > 6) console.log(`                 ! ... and ${ps.length - 6} more (--json lists them)`); }
+  if (out.knocking) console.log(`  knocking    ${out.knocking}; a 429 is the origin's rate limit, and a route it hides can still be a 402`);
   console.log(`\n  knocked     ${out.knocked.map((k) => `${k.path} ${k.status}${k.dialects.length ? ` ${k.dialects.join("+")}` : ""}`).join("; ")}`);
   if (out.payPerCrawl.length) console.log(`  pay-per-crawl  ${out.payPerCrawl.map((p) => `${p.path} (${p.price || "no price named"})`).join(", ")}: the EDGE is charging crawlers; that is not a merchant door`);
   if (out.unknown402.length) console.log(`  unknown 402 ${out.unknown402.join(", ")}: a 402 in no dialect this probe reads; go look`);

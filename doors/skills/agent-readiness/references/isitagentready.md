@@ -39,7 +39,10 @@ Five categories. Commerce is scored only when `isCommerce` is true, and
 | `mpp` | commerce | Support MPP for agent-native HTTP payments | `agent-commerce` |
 | `ap2` | commerce | AP2 declared in the A2A Agent Card | `agent-commerce` |
 
-Statuses: `pass`, `fail`, `neutral` (not counted), `unableToCheck`. Each check
+Statuses: `pass`, `fail`, `neutral` (not counted), `unableToCheck`. An origin
+whose `/` answers 404 gets `siteError: not_found` and no checks at all, which
+refuses every API host with no homepage (api.exa.ai sells over x402 and MPP
+and cannot be scanned there); a 403 or a bot page gets `siteError: blocked`. Each check
 carries an `evidence[]` of the requests made and a `finding` per step, which is
 the part of their design worth copying: a verdict with its receipts.
 

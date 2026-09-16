@@ -76,7 +76,13 @@ Every row below was measured on 2026-09-16 with `--reference`.
   RFC makes a MUST, and reads the frontmatter a loader needs.
 - **A bot wall.** Theirs returns a `siteError` with no per-check output when
   the origin refuses it. Ours runs the audit's two controls first and marks the
-  run unmeasurable, which is the same answer with the reason attached.
+  run unmeasurable, which is the same answer with the reason attached. When
+  only the commerce probe is refused (a retailer that lets a browser in and
+  refuses unknown user-agents: sephora.com), its five rows read `unknown`
+  rather than "no commerce".
+- **No homepage.** Theirs refuses an origin whose `/` is 404 (`siteError:
+  not_found`), which is every API host without a landing page. Ours reads a
+  404 as measurable: api.exa.ai sells over x402 and MPP behind such a root.
 
 ## What a commerce platform does with it
 

@@ -118,7 +118,9 @@ function fold(audit, auth, skills, commerce, own) {
   r.webMcp = row(own.webmcp.verdict, own.webmcp.detail);
   r.ard = row(own.ard.verdict, own.ard.detail);
   const cd = commerce.doors || {}; const sells = commerce.commerce?.verdict === "yes" || commerce.commerce?.verdict === "likely";
-  for (const k of ["ucp", "acp", "x402", "mpp", "ap2"]) { const c = cd[k] || { verdict: "unknown", detail: commerce.error || "not probed" }; r[k] = row(c.verdict, c.detail); if (!sells && r[k].status === "fail" && profile !== "commerce") r[k].status = "neutral"; }
+  // The commerce probe can be walled while the audit's browser control got in (a retailer that refuses unknown user-agents); its doors are unknown then, never "no commerce".
+  const walled = commerce.measurable === false;
+  for (const k of ["ucp", "acp", "x402", "mpp", "ap2"]) { const c = cd[k] || { verdict: "unknown", detail: commerce.error || "not probed" }; r[k] = row(walled ? "unknown" : c.verdict, c.detail); if (!walled && !sells && r[k].status === "fail" && profile !== "commerce") r[k].status = "neutral"; }
   if (r.webBotAuth.status === "fail") r.webBotAuth.status = "neutral"; // their scanner: informational only, since it grades the site's OWN crawler
   return r;
 }
@@ -159,6 +161,8 @@ async function reference() {
 async function main() {
   const [audit, auth, skills, commerce, own, ref] = await Promise.all([run(SIBLING.audit), run(SIBLING.auth), run(SIBLING.skills), run(SIBLING.commerce), ownReads(), REFERENCE ? reference() : null]);
   const measurable = audit.controls ? audit.controls.measurable !== false : !audit.error;
+  // A 404 on / is an API host with no homepage (api.exa.ai), which the audit declines and Cloudflare's scanner refuses outright (siteError not_found); the other probes still ran and their rows are real.
+  const noHomepage = !measurable && /HTTP 404/.test(audit.controls?.browser?.detail || "") && /HTTP 404/.test(audit.controls?.self?.detail || "");
   const checks = fold(audit, auth, skills, commerce, own);
   const lad = ladder(checks); const rungs = commerceRungs(checks);
   const counted = CHECKS.filter(([cat]) => (profile === "content" ? cat === "discoverability" || cat === "content" || cat === "botAccess" : profile === "api" ? cat !== "commerce" : true)).filter(([, k]) => checks[k].status !== "neutral" && checks[k].status !== "unknown");
@@ -170,9 +174,11 @@ async function main() {
   if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); return; }
 
   console.log(`${origin}   profile ${profile}\n`);
-  if (!measurable) console.log(`  ! the audit's controls failed (${JSON.stringify(audit.controls || audit.error)}): this origin refuses the instrument, so every "no" below is uninterpretable\n`);
+  if (noHomepage) console.log(`  ! GET / answers 404: an API host with no homepage. The audit declined, so its doors read as unknown; the auth, skills and commerce rows below ran and are real.\n`);
+  else if (!measurable) console.log(`  ! the audit's controls failed (${JSON.stringify(audit.controls || audit.error)}): this origin refuses the instrument, so every "no" below is uninterpretable\n`);
+  if (commerce.measurable === false) console.log(`  ! the commerce probe was refused (${commerce.doors?.ucp?.detail}); its five rows read as unknown\n`);
   console.log(`  level ${lad.level} of 5   ${lad.name}          ${passed} of ${counted.length} counted checks pass`);
-  console.log(`  commerce       ${out.sells === "yes" ? "sells" : out.sells === "likely" ? "probably sells" : "no commerce signal"}${out.signals.length ? ` (${out.signals.join(", ")})` : ""}: ${rungs.transactable ? "transactable" : "not transactable"}, ${rungs.payable ? "payable" : "not payable"}, ${rungs.delegable ? "delegable" : "not delegable"}\n`);
+  console.log(`  commerce       ${out.sells === "yes" ? "sells" : out.sells === "likely" ? "probably sells" : out.sells === "unknown" ? "unknown (probe refused)" : "no commerce signal"}${out.signals.length ? ` (${out.signals.join(", ")})` : ""}: ${rungs.transactable ? "transactable" : "not transactable"}, ${rungs.payable ? "payable" : "not payable"}, ${rungs.delegable ? "delegable" : "not delegable"}\n`);
   let cat = ""; for (const [c, k, label] of CHECKS) { if (c !== cat) { cat = c; console.log(`  ${c}`); } const ck = checks[k]; console.log(`    ${(ck.status === "pass" ? "open" : ck.status === "neutral" ? "n/a " : ck.status === "unknown" ? "?   " : "shut").padEnd(5)} ${label.padEnd(38)} ${ck.detail}`); }
   console.log(`\n  next (in order)`);
   if (!todo.length) console.log(`    nothing: every counted door is open`);
