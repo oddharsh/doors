@@ -30,14 +30,23 @@ document below and only JSON that parses is counted.
 
 **A field note from the first foreign run (2026-09-16).** A Shopify storefront
 passes the presence checks on every scanner: it serves AS metadata and a PRM at
-its own origin. The chain has two broken hops. The AS document at
-`store.example/.well-known/oauth-authorization-server` carries
-`issuer: https://shopify.com/authentication/<id>`, which does not derive to the
-path it was served from, and RFC 8414 s3.3 tells a client to reject exactly
-that. The PRM then names `accounts.store.example` as an authorization server,
-whose metadata says it is `shopify.com/authentication/<id>` too. A client that
-validates issuers, which the MCP spec requires, dead-ends on a site that reads
-as fully configured. Presence checks cannot see this; the walk can.
+its own origin. The chain has one broken hop and one trap beside it. The PRM
+names `accounts.store.example` as an authorization server, and that host's
+metadata says its issuer is `https://shopify.com/authentication/<id>`; RFC 8414
+s3.3 tells a client to reject exactly that, so a client that validates issuers
+(the MCP spec requires it) dead-ends on a site that reads as fully configured.
+The trap is the AS document the storefront ALSO serves at its own root, with
+the same foreign issuer: nothing on the chain points at it, so it breaks
+nothing, and any client or scanner that starts from the origin rather than the
+PRM reads it and rejects it. The probe reports the first as a broken hop and
+the second as a note. Presence checks cannot see either; the walk can.
+
+The same shape, without the break, is common on hosted MCP servers:
+`mcp.stripe.com` serves AS metadata at its root whose issuer is
+`access.stripe.com/mcp`, and its PRM names `access.stripe.com/mcp` directly, so
+the chain holds and the root document is a note. `mcp.sentry.dev` keeps its PRM
+at the path-suffixed `/.well-known/oauth-protected-resource/mcp` and names it
+from the 401, which is why the probe knocks first and follows the header.
 
 ## What to build, in order
 

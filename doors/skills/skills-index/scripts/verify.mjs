@@ -81,9 +81,10 @@ async function main() {
     }
     out.skills.push(row);
   }
-  const bad = out.skills.filter((s) => s.problems.length);
+  const digestBad = out.skills.filter((s) => s.digestMatches === false || s.status !== 200).length; const fmBad = out.skills.filter((s) => s.problems.some((p) => /frontmatter/.test(p))).length; const otherBad = out.skills.filter((s) => s.problems.length).length - fmBad;
   out.index.verified = out.skills.filter((s) => s.digestMatches).length;
-  out.index.verdict += bad.length ? `; ${bad.length} with problems` : entries.length ? "; every digest verifies" : "";
+  out.index.verdict += !entries.length ? "" : digestBad ? `; ${digestBad} artifact(s) missing or with a digest mismatch` : "; every digest verifies";
+  if (fmBad) out.index.verdict += `; ${fmBad} without the frontmatter a loader needs`; else if (otherBad) out.index.verdict += `; ${otherBad} with problems`;
   finish(out);
 }
 function finish(out) {

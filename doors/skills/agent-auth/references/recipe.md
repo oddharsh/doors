@@ -81,12 +81,14 @@ browser case.
 
 ## Field note: a hosted authorization server mirrored at the storefront
 
-Measured 2026-09-16 on a Shopify storefront. The store's own origin serves an
-AS document whose `issuer` is `https://shopify.com/authentication/<shop-id>`.
-Fetched by derivation from that issuer it is correct; fetched from the store's
-origin, where every scanner and the PRM's own `authorization_servers` entry
-(`accounts.<store>`) lead, it fails the s3.3 comparison. Two fixes are honest:
-name `https://shopify.com/authentication/<shop-id>` in the PRM and stop
-mirroring, or make the store the issuer and proxy the endpoints. Passing a
-presence check with the mirror is the one option that leaves a strict client
-stuck.
+Measured 2026-09-16 on a Shopify storefront. The PRM names
+`accounts.<store>` as an authorization server, and that host's metadata says
+`issuer: https://shopify.com/authentication/<shop-id>`, which fails the s3.3
+comparison: that hop is broken. The store's own origin also serves an AS
+document with the same foreign issuer, which nothing on the chain points at
+(the PRM's other entry, `shopify.com/authentication/<shop-id>`, resolves
+cleanly), so it is a trap for anyone starting at the origin rather than a break.
+Two fixes are honest: drop `accounts.<store>` from `authorization_servers` and
+stop mirroring, or make `accounts.<store>` a real issuer whose metadata says so.
+Passing a presence check with the mirror is the option that leaves a strict
+client stuck.

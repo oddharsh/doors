@@ -1,0 +1,38 @@
+{
+  "$comment": "Live origins that exercise the probes, one row per shape worth learning from. `expect` is coarse on purpose (a verdict per door, a count, a control) so the suite catches an instrument regression without flapping on a site's day-to-day. Recorded 2026-09-16; a row that drifts is either the site changing (update the row, say why) or the probe regressing (fix the probe). Run: node evals/corpus.mjs [--only commerce|auth|skills] [--expect].",
+  "commerce": [
+    { "origin": "https://stableenrich.dev", "teaches": "x402 v2 and MPP on ONE 402 (PAYMENT-REQUIRED + WWW-Authenticate: Payment); x-payment-info in the {price, protocols:[{x402},{mpp}]} shape; paid routes only in /openapi.json, which is why a three-path knock reports it absent", "expect": { "measurable": true, "sells": "yes", "x402": "yes", "mpp": "yes", "ucp": "no" } },
+    { "origin": "https://api.nansen.ai", "teaches": "x-payment-info with protocols as STRINGS and a dollar price; rate-limits a burst of knocks (429), which is why the probe knocks three at a time and stops", "expect": { "measurable": true, "x402": "yes", "mpp": ["likely", "yes"] } },
+    { "origin": "https://mpp.orthogonal.com", "teaches": "an API marketplace: the homepage is Markdown naming 40+ per-service /<name>/openapi.json documents in prose (no href); offers[] with method=protocol and rail=payment method and a numeric price at the top", "expect": { "measurable": true, "mpp": "yes", "x402": "no" } },
+    { "origin": "https://mpp.browserbase.com", "teaches": "no discovery document at all; the homepage lists routes as `POST /fetch` and the 402 is the only evidence", "expect": { "measurable": true, "mpp": "yes" } },
+    { "origin": "https://govlaws.ai", "teaches": "separate /api/mpp/* and /api/x402/* route families, two openapi documents (/openapi.json and /api/openapi.json), and 401-before-402 on the generic routes", "expect": { "measurable": true, "x402": "yes", "mpp": "yes" } },
+    { "origin": "https://api.exa.ai", "teaches": "an API host whose / answers 404: measurable (not a wall), sells (x402+mpp), and Cloudflare's scanner refuses it outright with siteError not_found", "expect": { "measurable": true, "sells": "yes", "x402": "yes", "mpp": "yes" } },
+    { "origin": "https://agi.apify.com", "teaches": "x402 Bazaar-listed seller that also speaks MPP", "expect": { "measurable": true, "x402": "yes", "mpp": "yes" } },
+    { "origin": "https://api.onesource.io", "teaches": "the Bazaar's largest single host (25 resources); dual protocol", "expect": { "measurable": true, "x402": "yes", "mpp": "yes" } },
+    { "origin": "https://x402.ottoai.services", "teaches": "x402 only, no MPP challenge, no discovery document", "expect": { "measurable": true, "x402": "yes", "mpp": "no" } },
+    { "origin": "https://www.allbirds.com", "teaches": "a Shopify storefront: UCP profile ships platform-wide (mcp + embedded services, 8 capabilities, 3 payment handlers), the mcp endpoint 301s a GET and answers a JSON-RPC POST, no acp.json, no agent card so no AP2", "expect": { "measurable": true, "sells": "yes", "ucp": "yes", "acp": "no", "ap2": "no" } },
+    { "origin": "https://www.gymshark.com", "teaches": "Shopify platform fingerprint on the homepage but NO /.well-known/ucp: the profile is not on every Shopify domain, so read the door rather than the platform", "expect": { "measurable": true, "sells": "yes", "ucp": "no" } },
+    { "origin": "https://www.target.com", "teaches": "a UCP-named participant with nothing at /.well-known/ucp on the public storefront; sells by cart and payment signals only", "expect": { "measurable": true, "sells": ["likely", "yes"], "ucp": "no" } },
+    { "origin": "https://www.sephora.com", "teaches": "403 to this probe's user-agent while a browser gets 200: unmeasurable, every door unknown, and the ladder says the commerce probe was refused rather than reporting no commerce", "expect": { "measurable": false } },
+    { "origin": "https://www.lowes.com", "teaches": "a 200 that is a bot-check page: the challenge regex is what makes it unmeasurable", "expect": { "measurable": false } },
+    { "origin": "https://www.etsy.com", "teaches": "DataDome 403; Cloudflare's scanner also returns siteError blocked here", "expect": { "measurable": false } },
+    { "origin": "https://aadhar.sh", "teaches": "the reference site: an x402 gate that exists and is unconfigured (x-payment-note), read as maybe; no commerce signal; level 5 elsewhere", "expect": { "measurable": true, "sells": "no", "x402": "maybe", "ap2": "no" } }
+  ],
+  "auth": [
+    { "origin": "https://mcp.sentry.dev", "teaches": "PRM at the path-suffixed /.well-known/oauth-protected-resource/mcp, named by the 401 on /mcp; every hop answers", "expect": { "chain": 0, "prmAt": "/.well-known/oauth-protected-resource/mcp", "challenge401": true } },
+    { "origin": "https://mcp.stripe.com", "teaches": "PRM names a hosted issuer (access.stripe.com/mcp) that resolves; the root AS document carries that foreign issuer, which is a note (nothing on the chain points at it) rather than a break", "expect": { "chain": 0, "issuerNote": true } },
+    { "origin": "https://mcp.notion.com", "teaches": "a clean first-party chain: PRM and AS at the root, issuer agrees", "expect": { "chain": 0 } },
+    { "origin": "https://mcp.linear.app", "teaches": "PRM resource is the /mcp path rather than the origin", "expect": { "chain": 0 } },
+    { "origin": "https://www.allbirds.com", "teaches": "one broken hop: the PRM names accounts.<store>, whose metadata says shopify.com/authentication/<id>; plus the mirrored root AS as a note", "expect": { "chain": 1, "issuerNote": true } },
+    { "origin": "https://aadhar.sh", "teaches": "the reference: anonymous agent_auth registration answering 201, auth.md with 4 of 4 markers, /mcp answers 405 to a GET so no Bearer challenge on that method", "expect": { "chain": 0, "authMdMarkers": 4 } },
+    { "origin": "https://example.org", "teaches": "a clean absence: three 404s and a passing ghost control", "expect": { "chain": 0, "asAbsent": true } }
+  ],
+  "skills": [
+    { "origin": "https://isitagentready.com", "teaches": "24 skills, every digest verifies, none with frontmatter; and a catch-all under /.well-known/agent-skills/ that answers 200 for a path that cannot exist (the ghost control fails)", "expect": { "skills": 24, "verified": 24, "ghost": "fail" } },
+    { "origin": "https://developers.cloudflare.com", "teaches": "14 skills, all verify", "expect": { "verified": 14, "ghost": "pass" } },
+    { "origin": "https://vercel.com", "teaches": "9 skills, all verify", "expect": { "verified": 9 } },
+    { "origin": "https://supabase.com", "teaches": "2 skills, all verify", "expect": { "verified": 2 } },
+    { "origin": "https://aadhar.sh", "teaches": "the reference: one site skill for a public MCP server", "expect": { "skills": 1, "verified": 1 } },
+    { "origin": "https://docs.stripe.com", "teaches": "no index", "expect": { "absent": true } }
+  ]
+}

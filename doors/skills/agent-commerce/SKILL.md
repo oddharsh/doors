@@ -43,7 +43,16 @@ it is the edge charging crawlers rather than a merchant door.
 
 `--control` starts a local server that speaks all four and validates every
 document reader against known-good fixtures. Run it once before trusting a
-"no" from a foreign origin.
+"no" from a foreign origin. Two more controls run on every target: `/` has to
+answer this probe (a 403, a 429, a connection refusal or a bot-check page makes
+every door `unknown`, and a 404 is an API host with no homepage, which is
+measurable), and a well-known path that cannot exist must not answer 200.
+
+Knocks go three at a time and stop after three 429s in a row, because a paid
+API rate-limits strangers and a burst of 24 parallel knocks came back as 20
+unknowns from one seller on the first corpus run. The `knocking` line says how
+many routes were rate-limited or never knocked; a route the limit hid can still
+be a 402.
 
 ## What the verdicts mean
 
@@ -57,12 +66,22 @@ document reader against known-good fixtures. Run it once before trusting a
 
 Two MPP readings are worth knowing. Discovery is advisory and the Challenge is
 authoritative (mpp.dev says so), so the probe knocks every advertised
-operation and lists the ones that answer 200 without payment: a document
-describing a gate that is not there. And `x-payment-info` has three shapes in
-the wild: canonical `offers[]`, the flat single-offer shorthand, and a
-multi-protocol `{price, protocols:[{x402:{}},{mpp:{...}}]}` form that
-x402-plus-MPP sellers emit. The third is read for what it says and flagged,
-because a canonical MPP client parses none of it.
+operation and lists the ones that answer 200 without payment (a document
+describing a gate that is not there) and the ones that answer 401 (MPP allows
+authentication before payment, so that is a door behind a login). And
+`x-payment-info` has FIVE shapes in the wild, measured across the corpus in
+`evals/corpus.json`: canonical `offers[]`; the flat single-offer shorthand;
+`{price, protocols:[{x402:{}},{mpp:{...}}]}` with objects; the same with
+`protocols: ["x402","mpp"]` as strings and a `"$0.05"` price; and `offers[]`
+where `method` names the protocol and `rail` names the payment method. The
+last three are read for what they say and flagged once each, because a
+canonical MPP client parses none of them.
+
+Discovery documents are found in four places: `/openapi.json` and its
+well-known and YAML spellings, any `openapi` URL the homepage links or names in
+prose (an API marketplace's front page is rendered Markdown naming 40
+per-service `/<name>/openapi.json` documents), with each document's
+`servers[0].url` prefixed onto its paths.
 
 ## What to build, by what you sell
 

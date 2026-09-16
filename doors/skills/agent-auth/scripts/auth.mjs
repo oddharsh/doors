@@ -20,7 +20,8 @@
 // "present" for every document below. Zero dependencies.
 const UA = "doors-agent-auth/0.1 (+https://github.com/oddharsh/doors)";
 const args = process.argv.slice(2); const target = args.find((a) => !a.startsWith("--")); const JSON_OUT = args.includes("--json");
-const protectedPath = args[args.indexOf("--protected") + 1] && args.includes("--protected") ? args[args.indexOf("--protected") + 1] : null;
+// The route to knock: --protected, else /mcp, which is the consumer this chain exists for and the path most hosted MCP servers use.
+const protectedPath = args.includes("--protected") ? args[args.indexOf("--protected") + 1] : "/mcp";
 if (!target) { console.error("usage: auth.mjs <origin> [--protected <path>] [--json]"); process.exit(2); }
 const origin = new URL(target).origin;
 
@@ -53,9 +54,14 @@ async function knock(u, method = "POST") {
 }
 
 async function main() {
-  const [as, prm, authMd, ghost] = await Promise.all([
+  // The challenge first, because RFC 9728 s5.1 lets it NAME the PRM, and hosted MCP servers keep theirs at the path-suffixed location (/.well-known/oauth-protected-resource/mcp; mcp.sentry.dev does, 2026-09-16).
+  const knockRes = await req(origin + protectedPath, { accept: "application/json, text/event-stream" });
+  const wa = knockRes.headers.get("www-authenticate") || ""; const named = /resource_metadata="([^"]+)"/i.exec(wa)?.[1] || null;
+  const prmCandidates = [...new Set([named, origin + "/.well-known/oauth-protected-resource", origin + "/.well-known/oauth-protected-resource" + protectedPath.replace(/\/$/, ""), origin + "/.well-known/oauth-protected-resource/mcp", origin + "/.well-known/oauth-protected-resource/sse"].filter(Boolean))];
+  let prm = null; let prmUrl = null;
+  for (const u of prmCandidates) { const r = await req(u); if (r.status === 200 && !isHtml(r.text) && json(r.text)) { prm = r; prmUrl = u; break; } if (!prm) prm = r; }
+  const [as, authMd, ghost] = await Promise.all([
     readAs(origin),
-    req(origin + "/.well-known/oauth-protected-resource"),
     req(origin + "/auth.md", { accept: "text/markdown, text/plain;q=0.9, */*;q=0.1" }),
     req(`${origin}/.well-known/oauth-ghost-${Date.now().toString(36)}`),
   ]);
@@ -86,14 +92,14 @@ async function main() {
       contentType: as.contentType, cors: as.cors,
       agentAuth: agentAuth ? { registerUri: agentAuth.register_uri || agentAuth.identity_endpoint || null, identityTypes: agentAuth.identity_types_supported || null, credentialTypes: agentAuth.credential_types_supported || null, skill: agentAuth.skill || null } : null,
     };
-    if (!issuerMatches) out.chain.push(`AS metadata at ${as.url} carries issuer ${d.issuer}, which does not derive to that path (RFC 8414 s3.3: a client MUST reject the mismatch)`);
+    out.authorizationServer.issuerNote = issuerMatches ? null : `AS metadata at ${as.url.replace(origin, "")} carries issuer ${d.issuer}, which does not derive to that path; a client that reaches it by derivation from this origin MUST reject it (RFC 8414 s3.3)`;
     if (token && !token.answers) out.chain.push(`token_endpoint ${d.token_endpoint} answers ${token.status} to a POST; an agent following this metadata dead-ends`);
     if (agentAuth?.register_uri) { const k = await knock(agentAuth.register_uri, "POST"); out.authorizationServer.agentAuth.register = k; if (!k.answers) out.chain.push(`agent_auth.register_uri ${agentAuth.register_uri} answers ${k.status}`); }
   }
 
   // Protected resource metadata (RFC 9728)
   const p = prm.status === 200 && !isHtml(prm.text) ? json(prm.text) : null;
-  if (prm.status !== 200) out.protectedResource = { verdict: `absent (HTTP ${prm.status || prm.error})` };
+  if (prm.status !== 200) out.protectedResource = { verdict: `absent (HTTP ${prm.status || prm.error} at ${prmCandidates.length} candidate path${prmCandidates.length === 1 ? "" : "s"})`, tried: prmCandidates.map((u) => u.replace(origin, "")) };
   else if (!p) out.protectedResource = { verdict: "present but not JSON" + (isHtml(prm.text) ? " (HTML at the path)" : "") };
   else {
     const missing = []; if (!p.resource) missing.push("resource");
@@ -101,8 +107,12 @@ async function main() {
     const resolved = await Promise.all(servers.slice(0, 4).map(async (iss) => { const m = await readAs(iss); return { issuer: iss, metadata: m.url, status: m.status, issuerAgrees: Boolean(m.doc && typeof m.doc.issuer === "string" && m.doc.issuer.replace(/\/$/, "") === String(iss).replace(/\/$/, "")) }; }));
     const asScopes = out.authorizationServer.scopes; const prmScopes = Array.isArray(p.scopes_supported) ? p.scopes_supported : null;
     const scopeGap = asScopes && prmScopes ? prmScopes.filter((s) => !asScopes.includes(s)) : [];
+    // The mirrored-issuer question: if the PRM names THIS origin as an authorization server, the root AS document is on the chain and its issuer has to derive; otherwise it is a document no client fetches.
+    const namesSelf = servers.some((iss) => same(iss, origin));
+    if (namesSelf && out.authorizationServer.issuerNote) out.chain.push(out.authorizationServer.issuerNote.replace("; a client that reaches it by derivation from this origin MUST reject it", " and the PRM names this origin as an authorization server, so a client reaches it and MUST reject it"));
     out.protectedResource = {
-      verdict: missing.length ? `present but missing ${missing.join(", ")}` : `present: ${p.resource}${servers.length ? `, ${servers.length} authorization server${servers.length === 1 ? "" : "s"}` : ", names no authorization server"}`,
+      at: prmUrl.replace(origin, ""), namedByChallenge: Boolean(named),
+      verdict: missing.length ? `present but missing ${missing.join(", ")}` : `present at ${prmUrl.replace(origin, "")}${named ? " (named by the 401)" : ""}: ${p.resource}${servers.length ? `, ${servers.length} authorization server${servers.length === 1 ? "" : "s"}` : ", names no authorization server"}`,
       resource: p.resource || null, resourceIsThisOrigin: typeof p.resource === "string" && same(p.resource, origin),
       authorizationServers: resolved, scopes: prmScopes, bearerMethods: p.bearer_methods_supported || null, documentation: p.resource_documentation || null,
       contentType: prm.headers.get("content-type"), cors: prm.headers.get("access-control-allow-origin"), scopesNotOnAs: scopeGap,
@@ -125,19 +135,16 @@ async function main() {
   }
 
   // The challenge, which is where a real client enters the chain: 401 + WWW-Authenticate: Bearer resource_metadata="...".
-  if (protectedPath) {
-    const r = await req(origin + protectedPath, { accept: "application/json" });
-    const wa = r.headers.get("www-authenticate") || "";
-    const rm = /resource_metadata="([^"]+)"/i.exec(wa)?.[1] || null;
+  { const r = knockRes; const rm = named;
     out.challenge = { path: protectedPath, status: r.status, wwwAuthenticate: wa || null, resourceMetadata: rm,
-      verdict: r.status === 401 && rm ? `401 naming resource_metadata (${rm})` : r.status === 401 ? "401 but WWW-Authenticate names no resource_metadata (RFC 9728 s5.1); an agent has to guess the well-known path" : r.status === 200 ? "200 without a credential: that route is not protected" : `HTTP ${r.status || r.error}, no Bearer challenge` };
-    if (rm && !same(rm, origin) && !out.protectedResource.authorizationServers) out.chain.push(`challenge points at ${rm}, off this origin`);
-  } else out.challenge = { verdict: "not knocked (pass --protected <path> to test the route that should answer 401 with resource_metadata)" };
+      verdict: r.status === 401 && rm ? `${protectedPath} answers 401 naming resource_metadata (${rm.replace(origin, "")})` : r.status === 401 ? `${protectedPath} answers 401 but WWW-Authenticate names no resource_metadata (RFC 9728 s5.1); an agent has to guess the well-known path` : r.status === 200 ? `${protectedPath} answers 200 without a credential: not a protected route` : r.status === 404 ? `${protectedPath} is not a route here (pass --protected <path> for the one that should challenge)` : `${protectedPath} answers HTTP ${r.status || r.error} to a GET, no Bearer challenge` };
+    if (rm && prmUrl && rm !== prmUrl) out.chain.push(`the 401 names ${rm} but the PRM that parsed was ${prmUrl}`); }
 
   if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); return; }
   console.log(`${origin}\n`);
   console.log(`  control        ${out.control.verdict}`);
   console.log(`  AS metadata    ${out.authorizationServer.verdict}`);
+  if (out.authorizationServer.issuerNote) console.log(`                 note: ${out.authorizationServer.issuerNote}`);
   if (out.authorizationServer.grantTypes) console.log(`                 grants ${out.authorizationServer.grantTypes.join(", ")}; token endpoint ${out.authorizationServer.tokenEndpoint ? `answers ${out.authorizationServer.tokenEndpoint.status}` : "not named"}${out.authorizationServer.cors ? "; CORS " + out.authorizationServer.cors : "; no CORS header"}`);
   if (out.authorizationServer.agentAuth) console.log(`                 agent_auth: register ${out.authorizationServer.agentAuth.registerUri || "(none)"}${out.authorizationServer.agentAuth.register ? ` (answers ${out.authorizationServer.agentAuth.register.status})` : ""}; identities ${(out.authorizationServer.agentAuth.identityTypes || []).join(", ") || "(none)"}`);
   console.log(`  PRM            ${out.protectedResource.verdict}`);
