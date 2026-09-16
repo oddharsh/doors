@@ -1,7 +1,7 @@
 {
   "name": "doors",
-  "version": "0.2.0",
-  "description": "Ten skills for making a website something an agent can walk into: an audit that grades any origin the way aadhar.sh/lens does, discovery files (llms.txt, sitemap, robots), Markdown twins with correct Accept negotiation, MCP doors with generated cards, shared-dictionary delivery, IndieWeb (h-card, rel=me, webmentions), crawler policy read with controls, agent identity (Web Bot Auth, agent card, DNS-AID), NLWeb /ask graded per field, and wire weight (who compressed, immutable assets, Early Hints, speculation, CSP by hash). Every skill ships a probe with a control first and a reference as the fallback.",
+  "version": "0.3.0",
+  "description": "Fourteen skills for making a website something an agent can walk into: a readiness ladder that computes isitagentready.com's 0-5 level from probes with controls and names the next door to build, an audit that grades any origin the way aadhar.sh/lens does, discovery files (llms.txt, sitemap, robots), Markdown twins with correct Accept negotiation, MCP doors with generated cards, shared-dictionary delivery, IndieWeb (h-card, rel=me, webmentions), crawler policy read with controls, agent identity (Web Bot Auth, agent card, DNS-AID), NLWeb /ask graded per field, wire weight (who compressed, immutable assets, Early Hints, speculation, CSP by hash), the OAuth chain an agent walks from a 401 (RFC 8414, RFC 9728, Auth.md), an Agent Skills index with verified digests, and the five commerce doors (UCP, ACP, x402, MPP, AP2) classified from the wire for a store or a paid API. Every skill ships a probe with a control first and a reference as the fallback.",
   "author": {
     "name": "Aadharsh Pannirselvam"
   }

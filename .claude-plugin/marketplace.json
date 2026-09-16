@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "doors",
-  "description": "Skills for making a website something an agent can walk into: discovery files, Markdown twins, MCP doors, shared dictionaries, IndieWeb, crawler policy, agent identity, NLWeb, wire weight, and an audit that grades any site the way aadhar.sh/lens does. Single-plugin marketplace; the plugin source is the doors/ subfolder.",
+  "description": "Skills for making a website something an agent can walk into: a readiness ladder (isitagentready.com's 0-5 levels, from probes with controls), discovery files, Markdown twins, MCP doors, shared dictionaries, IndieWeb, crawler policy, agent identity, NLWeb, wire weight, the OAuth chain for agents, an Agent Skills index, the five commerce doors (UCP, ACP, x402, MPP, AP2), and an audit that grades any site the way aadhar.sh/lens does. Single-plugin marketplace; the plugin source is the doors/ subfolder.",
   "owner": {
     "name": "Aadharsh Pannirselvam",
     "email": "aadharsh@archetype.fund"

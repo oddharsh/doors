@@ -57,6 +57,38 @@
       "expected_output": "Audits first, then works the absences in order of value with the matching skills, re-runs the audit at the end, and reports the before/after door count rather than a list of things done.",
       "files": [],
       "known_state": "Same origin as eval 1. The cross-skill run should audit, work the absences in value order, and re-audit, reporting a before and after count."
+    },
+    {
+      "id": 8,
+      "skill": "agent-readiness",
+      "prompt": "we run a shopify store at https://www.allbirds.com and the CEO saw isitagentready.com. what level are we and what do we actually have to build to move up? we care about agents being able to buy, not about blogs",
+      "expected_output": "Runs ladder.mjs with --profile commerce --reference, reports the level and the commerce rungs (transactable via UCP already, not payable, not delegable), shows the disagreement rows (Markdown negotiation passes on their scanner and reaches 0 of 7 real clients; WebMCP), and gives the to-do in ladder order naming the doors skill per line, with ACP and AP2 first for a store.",
+      "files": [],
+      "known_state": "On 2026-09-16 the store graded level 1 Basic Web Presence on both instruments; Shopify ships /.well-known/ucp and 10 WebMCP tools platform-wide; the OAuth chain has two broken hops (a mirrored issuer); no api-catalog, no agent card, no acp.json."
+    },
+    {
+      "id": 9,
+      "skill": "agent-commerce",
+      "prompt": "our API sells enrichment calls per request over x402. someone scanned us and said x402 was 'not detected' even though every paid route returns 402. the site is https://stableenrich.dev. what's going on and are we doing MPP right too",
+      "expected_output": "Runs --control first, then the probe; explains the scanner knocked /, /api and /api/v1 only while the paid routes are listed in /openapi.json; reports 12 routes answering 402 in x402 v2 with MPP challenges on the same responses; flags that x-payment-info uses the {price, protocols[]} shape a canonical MPP discovery client does not parse, and recommends offers[].",
+      "files": [],
+      "known_state": "Measured 2026-09-16: one 402 carries both PAYMENT-REQUIRED and WWW-Authenticate: Payment; /openapi.json has x-payment-info on 37 operations in the multi-protocol shape; no UCP, ACP, or agent card, which is correct for an API seller."
+    },
+    {
+      "id": 10,
+      "skill": "agent-auth",
+      "prompt": "claude desktop says it can't find the authorization server for our MCP endpoint, but we have openid-configuration and oauth-protected-resource published. site is https://aadhar.sh, the protected route is /mcp",
+      "expected_output": "Runs auth.mjs with --protected /mcp, walks the chain hop by hop, and reports where it breaks or that every hop answers; explains issuer derivation (RFC 8414 s3.3) and that a 401 must name resource_metadata; does not recommend rewriting documents that already agree.",
+      "files": [],
+      "known_state": "aadhar.sh: every hop answers (AS metadata, PRM, auth.md with 4 of 4 markers, register endpoint 201); /mcp answers 405 to a GET so the challenge line reports no Bearer challenge on that method, which is the correct reading rather than a broken chain."
+    },
+    {
+      "id": 11,
+      "skill": "skills-index",
+      "prompt": "we wrote three SKILL.md files for our docs site and put them under /.well-known/agent-skills/. an agent says 'skill failed to verify'. can you check https://isitagentready.com since they seem to do it right and then tell me what we're missing",
+      "expected_output": "Runs verify.mjs on the given origin, reports that all 24 digests verify and that none of the files carries frontmatter, explains the digest MUST from the RFC and the frontmatter requirement from agentskills.io, and offers index-skills.mjs with --check for CI so the index cannot drift from the bytes.",
+      "files": [],
+      "known_state": "isitagentready.com's index: 24 skill-md entries, schema 0.2.0, every digest verifies, zero files with YAML frontmatter (2026-09-16)."
     }
   ]
 }
