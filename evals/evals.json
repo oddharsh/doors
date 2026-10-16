@@ -89,6 +89,14 @@
       "expected_output": "Runs verify.mjs on the given origin, reports that all 24 digests verify and that none of the files carries frontmatter, explains the digest MUST from the RFC and the frontmatter requirement from agentskills.io, and offers index-skills.mjs with --check for CI so the index cannot drift from the bytes.",
       "files": [],
       "known_state": "isitagentready.com's index: 24 skill-md entries, schema 0.2.0, every digest verifies, zero files with YAML frontmatter (2026-09-16)."
+    },
+    {
+      "id": 12,
+      "skill": "agent-score",
+      "prompt": "vercel's own is-agentic scanner gives https://vercel.com an 87. what's keeping it off 100, which of those can we trust, and what's the fastest way to get the points back?",
+      "expected_output": "Runs score.mjs --control, then the origin with --reference; reports the score, buckets and label; leads with the essentials because each is worth about 7 points against at most 2.5 for a recommended check (the soft 404, the missing H1, OpenAPI security schemes without named scopes); reads the diff rows for disagreements and says which instrument to believe (search checks are theirs, crawler reachability is ours); names the doors skill per fix.",
+      "files": [],
+      "known_state": "Their report (scanned 2026-08-30): 87, essential 63.5/80 (8 of 11), recommended 18.2/20 (18 of 22), bonus +5 from 38 signals. Open: agent-friendly-404 failed (unknown paths answer 200 with the app shell), content-no-js partial (1013 characters, no H1), scoped-permissions partial (security schemes, no named scopes); rate-limit-headers failed, onboarding-friction, agent-instruction (/agent.txt with no when-to-use) and mcp-server (OAuth-locked, 5 of 6) partial."
     }
   ]
 }

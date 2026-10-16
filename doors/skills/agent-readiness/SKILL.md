@@ -84,6 +84,15 @@ Every row below was measured on 2026-09-16 with `--reference`.
   not_found`), which is every API host without a landing page. Ours reads a
   404 as measurable: api.exa.ai sells over x402 and MPP behind such a root.
 
+## The other number
+
+is-agentic.com (Vercel, scored by Ora) grades out of 100 instead of 0 to 5,
+and charges every site for page basics this ladder never looks at: text in
+the raw HTML, a real 404, `Vary: Accept` on the Markdown, no JavaScript
+redirects. A site can sit at level 5 here and lose points there.
+`agent-score` computes that number from the same probes plus its own page
+reads; run both when the audience is a developer platform.
+
 ## What a commerce platform does with it
 
 Run `--profile commerce --reference` on one storefront. The level and the
