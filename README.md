@@ -2,7 +2,7 @@
 
 Skills for making a website something an agent can walk into.
 
-Fourteen skills, each a probe that can fail plus a checklist for when it cannot run:
+Fifteen skills, each a probe that can fail plus a checklist for when it cannot run:
 
 | skill | does |
 |---|---|
@@ -16,6 +16,7 @@ Fourteen skills, each a probe that can fail plus a checklist for when it cannot 
 | `agent-identity` | Web Bot Auth signing with a key directory whose `kid` is the JWK thumbprint real verifiers key on, the agent card, and DNS-AID `_agents` records verified over DoH |
 | `nlweb-ask` | an NLWeb `/ask` that refuses what it cannot do, graded per result field with one real question, since a knock proves nothing |
 | `agent-readiness` | one command for the 0-5 ladder [isitagentready.com](https://isitagentready.com) grades with, computed from the probes below, with the next door to build and the skill that builds it; `--reference` runs Cloudflare's scanner beside it and prints every check where the two disagree, and why |
+| `agent-score` | the 0-100 [is-agentic.com](https://is-agentic.com) (Vercel, scored by Ora) gives a site, from its 36 checks over the probes here plus reads of the page, its 404, a sitemap sample and the OpenAPI document; the next check by points recovered and the skill that closes it; `--reference` reads their latest report and prints every check where the two disagree; `--control` shows each check green on one fixture and red on another |
 | `agent-commerce` | the five commerce doors, read from the wire: UCP and ACP profiles validated against their specs, x402 and MPP classified by 402 dialect (one response can carry both), AP2 on the agent card; routes come from the origin's own api-catalog and openapi.json, and a fixture control speaks all four dialects |
 | `agent-auth` | the OAuth chain an agent walks from a 401: RFC 9728 protected resource metadata, RFC 8414 / OIDC server metadata with an `issuer` that derives to its path, a token endpoint that answers, and Auth.md with an `agent_auth` block; every hop fetched |
 | `skills-index` | an Agent Skills discovery index with a digest per SKILL.md computed from the bytes that ship, a `--check` for CI, and a verifier that hashes every artifact the way the RFC says a client MUST |
@@ -25,9 +26,14 @@ Extracted from one working site, cited by path at a pinned commit: see
 `doors/references/site-paths.md`. The readiness ladder, its 22 checks and the
 commerce category fold in [isitagentready.com](https://isitagentready.com)'s
 rubric (2026-09-16); `doors/skills/agent-readiness/references/isitagentready.md`
-records what it checks and where doors measures differently.
+records what it checks and where doors measures differently. The 0-100 score
+folds in [is-agentic.com](https://is-agentic.com)'s 36 checks and its
+Essential/Recommended/Bonus arithmetic (2026-10-16), which reproduces their
+published score on 41 reports; `doors/skills/agent-score/references/is-agentic.md`
+keeps the roster, the arithmetic and the disagreements.
 
 For a store: `node doors/skills/agent-readiness/scripts/ladder.mjs https://store.example --profile commerce --reference`.
+For a developer platform: `node doors/skills/agent-score/scripts/score.mjs https://docs.example --reference`.
 
 `evals/corpus.json` is 29 live origins the probes learned from, each with what
 it teaches and a recorded expectation; `node evals/corpus.mjs --expect` runs the

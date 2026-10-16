@@ -21,7 +21,12 @@ of them declare that they write, and deep-compares the published card's tool
 names to the live list. Exit 1 on a card that drifts, because that is the
 one failure nothing else ever reports: a wrong card costs an agent a wasted
 probe and never a visible error. A 401 is reported as a locked door, present
-and unreadable, not as absence.
+and unreadable, not as absence. When the handshake advertises `resources`
+it also calls `resources/list` (an empty list breaks the promise; a tool-only
+server should drop the capability), and when a tool names an MCP App view
+(`_meta.ui.resourceUri`) it reads the `ui://` resource and reports whether it
+is HTML, carries a login form, and declares `_meta.ui.csp`. `agent-score`
+grades those three rows.
 
 ## Building the server
 

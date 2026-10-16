@@ -17,11 +17,13 @@ const cardArg = args.includes("--card") ? args[args.indexOf("--card") + 1] : nul
 if (!target) { console.error("usage: conform.mjs <origin or /mcp url> [--card /path.json] [--json]"); process.exit(2); }
 const u = new URL(target); const origin = u.origin; const endpoint = u.pathname === "/" ? "/mcp" : u.pathname;
 
+let session = null;
 async function rpc(method, params, extraHeaders = {}) {
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const res = await fetch(origin + endpoint, { method: "POST", body, signal: ctrl.signal, headers: { "user-agent": UA, "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-method": method, ...extraHeaders } });
+    const res = await fetch(origin + endpoint, { method: "POST", body, signal: ctrl.signal, headers: { "user-agent": UA, "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-method": method, ...(session ? { "mcp-session-id": session } : {}), ...extraHeaders } });
+    session = res.headers.get("mcp-session-id") || session; // a legacy streamable-HTTP server hands one out at initialize and refuses later calls without it
     const ct = (res.headers.get("content-type") || "").split(";")[0].trim();
     const text = await res.text();
     let json = null;
@@ -32,14 +34,14 @@ async function rpc(method, params, extraHeaders = {}) {
   finally { clearTimeout(t); }
 }
 const meta = { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} };
-const out = { origin, endpoint, era: null, versions: null, tools: null, card: null, notes: [] };
+const out = { origin, endpoint, era: null, versions: null, capabilities: null, tools: null, resources: null, app: null, card: null, notes: [] };
 
 // 1. modern knock
 let r = await rpc("server/discover", { _meta: meta });
 if (r.error) { out.era = "unknown"; out.notes.push(`probe failed: ${r.error}`); }
 else if (r.status === 401) { out.era = "locked"; out.notes.push(`401${r.www ? " " + r.www.split(" ")[0] : " (empty challenge)"}: a door, and we did not get to look`); }
 else if (r.json?.result) {
-  out.era = "modern"; out.versions = r.json.result.supportedVersions || r.json.result.protocolVersions || null;
+  out.era = "modern"; out.versions = r.json.result.supportedVersions || r.json.result.protocolVersions || null; out.capabilities = r.json.result.capabilities || null;
   out.notes.push(`server/discover answered (${r.ct})${r.json.result.resultType ? `, resultType ${r.json.result.resultType}` : ", no resultType (clients read absent as complete)"}`);
 } else if (r.json?.error?.code === -32022) {
   out.era = "modern-other-version"; out.versions = r.json.error.data?.supported || null;
@@ -48,11 +50,11 @@ else if (r.json?.result) {
   // the strict-header half: retry once carrying the version header, as a reply and only then
   const r2 = await rpc("server/discover", { _meta: meta }, { "mcp-protocol-version": MODERN });
   out.notes.push(`-32020 header mismatch on the first knock; retry with MCP-Protocol-Version -> HTTP ${r2.status}${r2.json?.result ? " result" : r2.json?.error ? ` error ${r2.json.error.code}` : ""}`);
-  if (r2.json?.result) { out.era = "modern"; out.versions = r2.json.result.supportedVersions || null; } else out.era = "unknown";
+  if (r2.json?.result) { out.era = "modern"; out.versions = r2.json.result.supportedVersions || null; out.capabilities = r2.json.result.capabilities || null; } else out.era = "unknown";
 } else if (r.json?.error?.code === -32601 || r.json?.error) {
   // legacy: no server/discover. Do the handshake it expects.
   const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "doors-mcp", version: "0.1" } });
-  if (init.json?.result) { out.era = "legacy"; out.versions = [init.json.result.protocolVersion]; out.notes.push(`legacy handshake: initialize answered protocolVersion ${init.json.result.protocolVersion}`); }
+  if (init.json?.result) { out.era = "legacy"; out.versions = [init.json.result.protocolVersion]; out.capabilities = init.json.result.capabilities || null; out.notes.push(`legacy handshake: initialize answered protocolVersion ${init.json.result.protocolVersion}`); }
   else { out.era = "unknown"; out.notes.push(`server/discover -> error ${r.json.error.code}; initialize -> HTTP ${init.status}${init.json?.error ? ` error ${init.json.error.code}` : ""}`); }
 } else out.notes.push(`HTTP ${r.status} ${r.ct}: ${r.text.slice(0, 120)}`), out.era = r.status === 404 ? "none" : "unknown";
 
@@ -64,9 +66,25 @@ if (["modern", "modern-other-version", "legacy"].includes(out.era)) {
   if (Array.isArray(tools)) {
     const writes = tools.filter((t) => t.annotations && t.annotations.readOnlyHint === false);
     const unannotated = tools.filter((t) => !t.annotations);
-    out.tools = { count: tools.length, names: tools.map((t) => t.name), writes: writes.map((t) => t.name), unannotated: unannotated.length };
+    // An MCP App names its view on the tool (`_meta.ui.resourceUri`, or the older flat `_meta["ui/resourceUri"]`); the view itself is a ui:// resource.
+    const views = [...new Set(tools.map((t) => t._meta?.ui?.resourceUri || t._meta?.["ui/resourceUri"]).filter(Boolean))];
+    out.tools = { count: tools.length, names: tools.map((t) => t.name), writes: writes.map((t) => t.name), unannotated: unannotated.length, views };
     out.notes.push(`${tools.length} tool(s); ${writes.length} declare readOnlyHint:false; ${unannotated.length} carry no annotations at all (a client must then assume they may write)`);
   } else out.notes.push(`tools/list -> HTTP ${tl.status}${tl.json?.error ? ` error ${tl.json.error.code}` : ""}`);
+  // A server that advertises `resources` in its handshake promises resources/list returns something; an empty list is a promise broken (a tool-only server should omit the capability).
+  if (out.capabilities?.resources) {
+    const rl = await rpc("resources/list", params); const list = rl.json?.result?.resources;
+    out.resources = Array.isArray(list) ? { count: list.length, uris: list.map((x) => x.uri).slice(0, 20) } : { count: null, error: `resources/list -> HTTP ${rl.status}${rl.json?.error ? ` error ${rl.json.error.code}` : ""}` };
+    out.notes.push(Array.isArray(list) ? `advertises resources; resources/list returned ${list.length}` : `advertises resources; ${out.resources.error}`);
+  }
+  // Read the first view: it must be HTML with no login form, and should declare its CSP in _meta.ui.csp.
+  const viewUri = out.tools?.views?.[0] || out.resources?.uris?.find((u) => /^ui:\/\//.test(u));
+  if (viewUri) {
+    const rr = await rpc("resources/read", { ...params, uri: viewUri }); const item = rr.json?.result?.contents?.[0];
+    const html = typeof item?.text === "string" ? item.text : "";
+    out.app = { view: viewUri, read: Boolean(item), html: /<(!doctype|html|body|div|script)/i.test(html), loginForm: /type=["']?password/i.test(html), csp: item?._meta?.ui?.csp || null };
+    out.notes.push(`MCP App view ${viewUri}: ${item ? `${html.length} chars${out.app.csp ? ", declares a CSP" : ", no _meta.ui.csp"}` : `resources/read -> HTTP ${rr.status}${rr.json?.error ? ` error ${rr.json.error.code}` : ""}`}`);
+  }
 }
 
 // 3. the published card, deep-compared to the live list by tool NAME set
