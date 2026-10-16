@@ -49,9 +49,13 @@ an agent that trusts the card gives up on the site rather than on the card.
    `Signature-Agent` headers, covering `@authority` and `signature-agent`, tagged
    `web-bot-auth`. `references/recipe.md` has the exact parameter string and the
    reference signer to read.
-3. **Agent card** at `/.well-known/agent-card.json`: name, provider, the
-   interfaces (an MCP URL with its protocol binding and server card, an A2A URL
-   if you have one) and skills. Every URL in it must answer.
+3. **Agent card** at `/.well-known/agent-card.json`: `name`, `version`,
+   `description`, `provider`, `supportedInterfaces` (an MCP URL with its
+   protocol binding and server card, an A2A URL if you have one) and `skills`
+   (each with `id`, `name`, `description`), which is the shape isitagentready's
+   level-4 check reads. Every URL in it must answer. A card with no interface
+   behind it is a door painted on a wall; a content site with no MCP or API
+   skips the card.
 4. **DNS-AID**: an SVCB record at `_index._agents.<host>` pointing at the host
    (`1 host. alpn="h2,h3" port=443 mandatory=alpn,port`). Publish `_a2a` or
    `_mcp` ONLY for a server that exists; a record pointing at nothing passes a

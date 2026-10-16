@@ -5,6 +5,11 @@ description: One command for the 0-100 agent-readiness score is-agentic.com (Ver
 
 # agent-score
 
+This skill measures. To build what it measures, start with `make-agent-ready`,
+which plans across this rubric and isitagentready's ladder for the kind of site
+it is; the page rows are built in `page-basics` and the API rows in
+`api-surface`.
+
 is-agentic.com grades a site out of 100: 80 points for Essential checks that
 every site is charged for (server-rendered text, real 404s, Markdown with
 `Vary: Accept`, crawlers let in, no JavaScript redirects, no login walls),

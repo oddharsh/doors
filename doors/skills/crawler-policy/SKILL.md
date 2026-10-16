@@ -54,7 +54,17 @@ exist: they travel WITH the bytes.
 
 ## Writing the policy
 
-Decide the three questions separately, then write each in its own place:
+Decide the three questions separately, then write each in its own place.
+Ask the owner; this is their policy, and a plan that assumes one is wrong half
+the time. Name the crawlers by class, because the classes do different things
+(isitagentready's fix sheet draws the same lines): **search** crawlers
+(OAI-SearchBot, Claude-SearchBot, PerplexityBot) decide whether the site
+appears in AI answers; **training** crawlers (GPTBot, ClaudeBot,
+Google-Extended, Applebot-Extended, CCBot, Bytespider, Amazonbot) do not; and
+**user-triggered fetchers** (ChatGPT-User, Claude-User, Perplexity-User) fetch
+because a person asked, and some vendors do not apply robots.txt to them at
+all. A lone `User-agent: *` group passes isitagentready's AI-rules check, but
+it cannot let search in and keep training out.
 
 1. **Who may fetch.** robots.txt, one group per decision. The matcher is
    longest-token-wins on the user-agent and longest-path-wins on the rule, with
@@ -68,7 +78,12 @@ Decide the three questions separately, then write each in its own place:
    path prefix, read by European text-and-data-mining tooling.
 3. **Whether the server agrees.** If you block at the edge (a WAF rule, a bot
    fight mode), say so in robots.txt too, or a polite crawler reads `Allow: /`,
-   fetches, and gets a 403 it has no way to interpret.
+   fetches, and gets a 403 it has no way to interpret. is-agentic.com makes this
+   an Essential (`agent-crawler-reachability`): an edge that refuses
+   ChatGPT-User, Claude-User or PerplexityBot costs a site with no API about 13
+   points, and www.nytimes.com lost it that way. Declare all three
+   `Content-Signal` keys (`search`, `ai-input`, `ai-train`); isitagentready's
+   level 2 needs the line and the AI rules together.
 
 The reference site allows every identity on every path and states the use in
 `Content-Signal`; that is a deliberate policy, not the absence of one, and the

@@ -5,6 +5,10 @@ description: One command that says how agent-ready an origin is on the 0-5 ladde
 
 # agent-readiness
 
+This skill measures. To build the next level, start with `make-agent-ready`,
+which turns this ladder and is-agentic's rubric into one brief for the kind of
+site it is, and names the skill that builds each door.
+
 isitagentready.com is Cloudflare's scanner: 22 checks in five categories,
 folded into a level from 0 (Not Ready) to 5 (Agent-Native), with a fix sheet
 per failing check. It is the number a merchant will be asked for, so this skill
