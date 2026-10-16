@@ -2,10 +2,16 @@
 
 Skills for making a website something an agent can walk into.
 
-Fifteen skills, each a probe that can fail plus a checklist for when it cannot run:
+Seventeen skills, each a probe that can fail plus a checklist for when it cannot run.
+Start with `make-agent-ready`: it turns both agent-readiness scanners' rubrics
+into one build brief for the kind of site you have, and the other skills are
+where each item on it is built.
 
 | skill | does |
 |---|---|
+| `make-agent-ready` | the front door: one ordered build brief that scores well on both [isitagentready.com](https://isitagentready.com) and [is-agentic.com](https://is-agentic.com), limited to what fits the site (`content`/personal, `business`, `app`, `store`), each item with why it counts on each scanner, the steps, the commands that prove it and the skill to load; plans only what is open on a live origin, or the whole build for a new one; 31 cards folded from Cloudflare's 24 fix skills, Vercel's fix text and the probes' field notes, with a `--check` that every check on both scanners has one |
+| `page-basics` | what both scanners charge every page for: text in the raw HTML with one H1 and stepped headings, a real 404 with a Markdown body, HTTP redirects, no login walls, canonical/lang/og, one honest JSON-LD identity, about/contact/privacy, pages under an agent's context budget |
+| `api-surface` | for a site with an API: OpenAPI from the code with tool-safe operationIds, an RFC 9727 catalog, problem+json errors (the unknown-route 404 too), live RateLimit headers, versioning with Sunset, one call that works cold, docs one click from home, onboarding stated in llms.txt |
 | `agent-audit` | grades any origin the way [aadhar.sh/lens](https://aadhar.sh/lens) does: llms.txt, agent card, api catalog, MCP, NLWeb, Markdown negotiation, AGENTS.md, robots, DNS-AID, Web Bot Auth, terms. Controls first. |
 | `discovery-files` | `llms.txt` at root and per section, `sitemap.xml`, `robots.txt` that allows your own bot, and a sweep that every advertised path answers |
 | `markdown-twins` | a `.md` twin for every page, and `Accept: text/markdown` negotiation that three of seven shipping agent clients actually need |
@@ -34,6 +40,7 @@ keeps the roster, the arithmetic and the disagreements.
 
 For a store: `node doors/skills/agent-readiness/scripts/ladder.mjs https://store.example --profile commerce --reference`.
 For a developer platform: `node doors/skills/agent-score/scripts/score.mjs https://docs.example --reference`.
+To build rather than grade: `node doors/skills/make-agent-ready/scripts/plan.mjs https://your.site --type content`.
 
 `evals/corpus.json` is 29 live origins the probes learned from, each with what
 it teaches and a recorded expectation; `node evals/corpus.mjs --expect` runs the

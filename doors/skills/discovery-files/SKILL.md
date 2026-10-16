@@ -34,6 +34,43 @@ If the site has a build step, generate the per-section files from the same
 registry that builds navigation, so a new page cannot be forgotten. The
 reference site does this (`references/site-paths.md`, discovery files row).
 
+Start with an H1 naming the site and a one-paragraph summary in a `>`
+blockquote (llmstxt.org's shape, and what isitagentready's fix sheet asks for).
+Then add a **`## When to use this site`** section: the concrete jobs the site is
+right for, each with the door to call (a page, its `.md` twin, an endpoint, an
+MCP tool). is-agentic.com grades this directly (`agent-instruction`, open on
+28 of 41 reports) and reads the same section for onboarding claims: if there is
+an API, say whether it is free, whether it needs a key and how to get one, and
+whether there is a sandbox. If nothing needs a key, say that. Name jobs, not
+adjectives; "generic marketing copy does not read as guidance" is their words.
+
+## Link headers
+
+The cheapest of isitagentready's level-1 trio is one header on the homepage
+response (RFC 8288), pointing at the machine doors that exist:
+
+```
+Link: </llms.txt>; rel="describedby"; type="text/plain", </index.md>; rel="alternate"; type="text/markdown"
+Link: </.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc", </docs>; rel="service-doc"
+```
+
+The first line fits any site; the second only a site with an API. On
+Cloudflare a Transform Rule or the Worker adds them without touching the
+origin. Every target must answer, like every other door here.
+
+## ARD, once there is more than one agentic resource
+
+`/.well-known/ai-catalog.json` (application/json, `Access-Control-Allow-Origin:
+*`) lists each agent-facing resource for registries: `specVersion`, a `host`
+(`displayName`, a stable `identifier`), and `entries[]`, each with an
+`identifier` of the form `urn:air:<host>:<kind>:<name>`, a `displayName`, a
+media `type` (`application/mcp-server-card+json`, ...), exactly one of `url` or
+`data`, and 2 to 5 `representativeQueries` a person would actually type. An
+`Agentmap:` line in robots.txt points at it when it lives elsewhere.
+isitagentready grades it outside the ladder; it is worth building when the site
+has two or more of an MCP server, an agent card, a skills index, NLWeb or an
+API.
+
 ## sitemap.xml and robots.txt
 
 The checklist in `references/checklist.md` covers both, including the one

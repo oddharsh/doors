@@ -39,11 +39,20 @@ and the rule that fixes it.
 3. **Negotiate at the page URL** with the tie rule: best q wins, ties go to
    the first-listed type, `*/*` never breaks a tie. Drop `q=0`. Answer HEAD
    with the same headers a GET would carry.
-4. **The negotiated response is `no-store`**; the `.md` URL is the cacheable
+4. **Send `Vary: Accept` on every negotiated response**, the 404 included;
+   is-agentic.com fails the check without it (the check was open on 25 of
+   41 reports, most of them not negotiating at all). Answer `406`
+   only when every type the client offers is refused, and optionally send
+   `x-markdown-tokens` with the twin's token count (isitagentready's fix sheet
+   asks for it). Both scanners send a bare `Accept: text/markdown`, so passing
+   them proves less than the replay does. On a Cloudflare zone, Markdown for
+   Agents converts at the edge with no code; replay it anyway, because the edge
+   answers the bare header and can still lose the tie.
+5. **The negotiated response is `no-store`**; the `.md` URL is the cacheable
    one. A URL-keyed cache in front of a negotiating route will otherwise hand
    HTML to an agent from a browser's cache entry, intermittently, which is
    the hardest shape of bug to believe in.
-5. **Advertise the twin**: `Link: <...md>; rel="alternate"; type="text/markdown"`
+6. **Advertise the twin**: `Link: <...md>; rel="alternate"; type="text/markdown"`
    or a `<link>`, and give the two big sections their own `llms.txt` so an
    agent finds the twin without the root index (`discovery-files`).
 

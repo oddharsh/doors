@@ -52,11 +52,11 @@
     },
     {
       "id": 7,
-      "skill": "cross",
+      "skill": "make-agent-ready",
       "prompt": "make https://example.org agent-native. it's a hugo site, I have an afternoon.",
-      "expected_output": "Audits first, then works the absences in order of value with the matching skills, re-runs the audit at the end, and reports the before/after door count rather than a list of things done.",
+      "expected_output": "Runs make-agent-ready's plan.mjs with --type content (a Hugo site is a content site), works the brief top down with the skill each card names (page basics and crawler policy before anything else, no MCP, OpenAPI or OAuth for a content site), re-runs the plan at the end, and reports the before and after: is-agentic score, isitagentready level, and cards open.",
       "files": [],
-      "known_state": "Same origin as eval 1. The cross-skill run should audit, work the absences in value order, and re-audit, reporting a before and after count."
+      "known_state": "Same origin as eval 1. A content site's honest ceilings are 100 on is-agentic and level 4 on isitagentready (via an Agent Skills index); the run should say so rather than invent an API to reach level 5."
     },
     {
       "id": 8,
@@ -97,6 +97,14 @@
       "expected_output": "Runs score.mjs --control, then the origin with --reference; reports the score, buckets and label; leads with the essentials because each is worth about 7 points against at most 2.5 for a recommended check (the soft 404, the missing H1, OpenAPI security schemes without named scopes); reads the diff rows for disagreements and says which instrument to believe (search checks are theirs, crawler reachability is ours); names the doors skill per fix.",
       "files": [],
       "known_state": "Their report (scanned 2026-08-30): 87, essential 63.5/80 (8 of 11), recommended 18.2/20 (18 of 22), bonus +5 from 38 signals. Open: agent-friendly-404 failed (unknown paths answer 200 with the app shell), content-no-js partial (1013 characters, no H1), scoped-permissions partial (security schemes, no named scopes); rate-limit-headers failed, onboarding-friction, agent-instruction (/agent.txt with no when-to-use) and mcp-server (OAuth-locked, 5 of 6) partial."
+    },
+    {
+      "id": 13,
+      "skill": "make-agent-ready",
+      "prompt": "i'm building a personal site from scratch (astro, cloudflare pages). before i write anything, what do i need so it does well on is-agentic and isitagentready? i don't have an api and don't want one",
+      "expected_output": "Runs plan.mjs --type personal with no origin and returns the content brief: site-type tag, crawler policy (asking the owner's AI policy rather than assuming one), Markdown negotiation with Vary and the tie rule, rendered text, real 404 with a Markdown body, HTTP redirects, public pages, sitemap, Link headers, Person JSON-LD (not an invented Organization), llms.txt with a when-to-use section, head tags, trust pages. It lists MCP, OpenAPI, OAuth, CLI and commerce as not for this site and explains that adding /mcp would switch on API Essentials; it names level 4 via an Agent Skills index as the honest isitagentready ceiling.",
+      "files": [],
+      "known_state": "No origin yet, so the plan is the static content brief from catalog.mjs (31 cards: 14 to build, 5 optional, 12 not for a content site)."
     }
   ]
 }

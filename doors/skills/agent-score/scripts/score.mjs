@@ -58,42 +58,42 @@ const rateHeaders = (r) => RATE.filter((h) => r?.headers?.get?.(h) != null);
 // Gates: `always`; `dev` (an API, OpenAPI, GraphQL, MCP, OAuth or developer docs is in evidence); `oauth` (any OAuth evidence, even a word);
 // `mcpResources` (the handshake advertises resources); `mcpApp` (a tool names a ui:// view); `priced` (dev, or the origin sells). Not counted otherwise.
 const CHECKS = [
-  ["content-no-js", "essential", "always", "Content without JavaScript", "agent-score", "server-render 500+ characters of real text with one H1 first and headings that step down one level at a time"],
-  ["agent-friendly-404", "essential", "always", "Agent-friendly 404s", "markdown-twins", "answer unknown paths 404 (never 200 with the app shell), and with Accept: text/markdown a short Markdown body linking sitemap, llms.txt, docs"],
+  ["content-no-js", "essential", "always", "Content without JavaScript", "page-basics", "server-render 500+ characters of real text with one H1 first and headings that step down one level at a time"],
+  ["agent-friendly-404", "essential", "always", "Agent-friendly 404s", "page-basics", "answer unknown paths 404 (never 200 with the app shell), and with Accept: text/markdown a short Markdown body linking sitemap, llms.txt, docs"],
   ["markdown-negotiation-vary", "essential", "always", "Markdown content negotiation (acceptmarkdown.com)", "markdown-twins", "answer Accept: text/markdown on / with text/markdown and Vary: Accept; keep HTML for Accept: text/html"],
   ["agent-crawler-reachability", "essential", "always", "Not blocked by bot detection", "crawler-policy", "let ChatGPT-User, Claude-User, PerplexityBot and the training crawlers reach / at the WAF; say no in robots.txt if you mean no"],
-  ["redirect-hygiene", "essential", "always", "Redirect hygiene", "agent-score", "replace meta-refresh and JavaScript redirects with HTTP 301/308, and keep chains to one or two hops"],
-  ["docs-auth-gate", "essential", "always", "Content behind auth", "agent-score", "serve content pages without a login wall; publish an ungated summary of anything that must stay gated"],
-  ["openapi-spec", "essential", "dev", "OpenAPI spec published", "agent-score", "serve /openapi.json and name it from the api-catalog as service-desc"],
+  ["redirect-hygiene", "essential", "always", "Redirect hygiene", "page-basics", "replace meta-refresh and JavaScript redirects with HTTP 301/308, and keep chains to one or two hops"],
+  ["docs-auth-gate", "essential", "always", "Content behind auth", "page-basics", "serve content pages without a login wall; publish an ungated summary of anything that must stay gated"],
+  ["openapi-spec", "essential", "dev", "OpenAPI spec published", "api-surface", "serve /openapi.json and name it from the api-catalog as service-desc"],
   ["scoped-permissions", "essential", "dev", "Scoped permissions", "agent-auth", "name OAuth scopes in the OpenAPI security scheme, or scopes_supported in RFC 9728 protected-resource metadata"],
-  ["json-error-responses", "essential", "dev", "JSON error responses", "agent-score", "answer API errors (404 included) with application/problem+json: type, title, status, detail"],
+  ["json-error-responses", "essential", "dev", "JSON error responses", "api-surface", "answer API errors (404 included) with application/problem+json: type, title, status, detail"],
   ["oauth-support", "essential", "oauth", "OAuth 2.0 support", "agent-auth", "serve /.well-known/oauth-authorization-server with an issuer equal to this origin and a token_endpoint that answers"],
   ["mcp-resource-listing", "essential", "mcpResources", "MCP resources exposed", "mcp-doors", "make resources/list return at least one resource, or drop the resources capability from the handshake"],
   ["mcp-view-domain", "essential", "mcpApp", "MCP App view reachable", "mcp-doors", "serve the ui:// view as HTML from resources/read, with no login form"],
   ["mcp-view-csp", "essential", "mcpApp", "MCP App view CSP", "mcp-doors", "declare _meta.ui.csp on the view (connectDomains, resourceDomains) with named origins, not *"],
-  ["json-ld", "recommended", "always", "JSON-LD structured data", "agent-score", "add one JSON-LD block of the identity type the site is (Organization, SoftwareApplication, Person, Article) with name, url, description"],
-  ["org-schema-completeness", "recommended", "always", "Organization schema completeness", "agent-score", "give the Organization JSON-LD a contactPoint (email or phone, contactType) and an address (PostalAddress)"],
-  ["metadata-completeness", "recommended", "always", "Metadata completeness", "agent-score", "put <link rel=canonical>, <html lang>, og:image and og:type on the homepage"],
+  ["json-ld", "recommended", "always", "JSON-LD structured data", "page-basics", "add one JSON-LD block of the identity type the site is (Organization, SoftwareApplication, Person, Article) with name, url, description"],
+  ["org-schema-completeness", "recommended", "always", "Organization schema completeness", "page-basics", "give the Organization JSON-LD a contactPoint (email or phone, contactType) and an address (PostalAddress)"],
+  ["metadata-completeness", "recommended", "always", "Metadata completeness", "page-basics", "put <link rel=canonical>, <html lang>, og:image and og:type on the homepage"],
   ["sitemap", "recommended", "always", "Sitemap exists", "discovery-files", "serve /sitemap.xml with lastmod and name it from robots.txt"],
-  ["trust-anchors", "recommended", "always", "Trust anchor pages", "agent-score", "publish /about, /contact and /privacy with 500+ characters each, linked from the homepage"],
+  ["trust-anchors", "recommended", "always", "Trust anchor pages", "page-basics", "publish /about, /contact and /privacy with 500+ characters each, linked from the homepage"],
   ["agent-instruction", "recommended", "always", "Agent instruction / when-to-use", "discovery-files", "add a \"## When to use\" section to llms.txt naming the jobs you are right for and how an agent should call you"],
-  ["content-efficiency", "recommended", "always", "Content efficiency", "wire-weight", "make readable text at least 5% of the homepage HTML: drop hydration blobs and inline styles, flatten wrappers"],
-  ["page-token-budget", "recommended", "always", "Page token budget", "markdown-twins", "keep each page's extracted text under 100K characters (~25K tokens); split long references and index them"],
-  ["brand-search-accuracy", "recommended", "always", "Brand name discoverability", "agent-score", "describe the main product in the homepage title and H1 so a search for brand + product finds this domain first"],
-  ["pricing-info", "recommended", "priced", "Pricing info accessible", "agent-score", "link a /pricing page from the homepage, or carry schema.org Offer with a price"],
-  ["public-api-docs", "recommended", "dev", "Public API/docs linked from homepage", "agent-score", "link /docs (or /developers, /api) from the homepage, with auth, endpoints and examples"],
-  ["developer-portal", "recommended", "dev", "Developer portal", "agent-score", "serve /developers (or a docs. host) with keys, quickstart and sandbox, linked from the homepage"],
-  ["public-api", "recommended", "dev", "Public API with reachable endpoints", "agent-score", "expose at least one GET in the OpenAPI document an agent can call (2xx JSON, or a 401 that challenges)"],
-  ["api-schema-analysis", "recommended", "dev", "API schema complexity analysis", "agent-score", "give every operation an operationId, a description, typed parameters and a typed request body"],
-  ["function-calling-compat", "recommended", "dev", "Function calling compatibility", "agent-score", "make operationIds unique and tool-name safe (^[A-Za-z0-9_-]{1,64}$), each with a description"],
-  ["response-schema-coverage", "recommended", "dev", "REST response schema coverage", "agent-score", "give every operation a typed 2xx response schema"],
-  ["api-error-model", "recommended", "dev", "REST typed error model", "agent-score", "give 4xx/5xx responses one typed error schema (or application/problem+json) across the spec"],
-  ["api-versioning-policy", "recommended", "dev", "REST versioning / deprecation policy", "agent-score", "version the API in the path (/v1) and mark retirements in the spec (deprecated: true, a Sunset header)"],
-  ["rate-limit-headers", "recommended", "dev", "Rate limit response headers", "agent-score", "send RateLimit / RateLimit-Policy on API responses and Retry-After on 429, and document them in the spec"],
+  ["content-efficiency", "recommended", "always", "Content efficiency", "page-basics", "make readable text at least 5% of the homepage HTML: drop hydration blobs and inline styles, flatten wrappers"],
+  ["page-token-budget", "recommended", "always", "Page token budget", "page-basics", "keep each page's extracted text under 100K characters (~25K tokens); split long references and index them"],
+  ["brand-search-accuracy", "recommended", "always", "Brand name discoverability", "page-basics", "describe the main product in the homepage title and H1 so a search for brand + product finds this domain first"],
+  ["pricing-info", "recommended", "priced", "Pricing info accessible", "page-basics", "link a /pricing page from the homepage, or carry schema.org Offer with a price"],
+  ["public-api-docs", "recommended", "dev", "Public API/docs linked from homepage", "api-surface", "link /docs (or /developers, /api) from the homepage, with auth, endpoints and examples"],
+  ["developer-portal", "recommended", "dev", "Developer portal", "api-surface", "serve /developers (or a docs. host) with keys, quickstart and sandbox, linked from the homepage"],
+  ["public-api", "recommended", "dev", "Public API with reachable endpoints", "api-surface", "expose at least one GET in the OpenAPI document an agent can call (2xx JSON, or a 401 that challenges)"],
+  ["api-schema-analysis", "recommended", "dev", "API schema complexity analysis", "api-surface", "give every operation an operationId, a description, typed parameters and a typed request body"],
+  ["function-calling-compat", "recommended", "dev", "Function calling compatibility", "api-surface", "make operationIds unique and tool-name safe (^[A-Za-z0-9_-]{1,64}$), each with a description"],
+  ["response-schema-coverage", "recommended", "dev", "REST response schema coverage", "api-surface", "give every operation a typed 2xx response schema"],
+  ["api-error-model", "recommended", "dev", "REST typed error model", "api-surface", "give 4xx/5xx responses one typed error schema (or application/problem+json) across the spec"],
+  ["api-versioning-policy", "recommended", "dev", "REST versioning / deprecation policy", "api-surface", "version the API in the path (/v1) and mark retirements in the spec (deprecated: true, a Sunset header)"],
+  ["rate-limit-headers", "recommended", "dev", "Rate limit response headers", "api-surface", "send RateLimit / RateLimit-Policy on API responses and Retry-After on 429, and document them in the spec"],
   ["mcp-server", "recommended", "dev", "MCP server / manifest", "mcp-doors", "serve Streamable HTTP MCP at /mcp with a public tools/list and a server card generated from it"],
-  ["cli-tool", "recommended", "dev", "CLI tool available", "agent-score", "publish a CLI on npm, PyPI or Homebrew and name the install command in llms.txt"],
-  ["onboarding-friction", "recommended", "dev", "Agent onboarding friction", "agent-score", "offer a free tier, self-serve API keys and a sandbox, and say so in llms.txt; one zero-auth endpoint proves it"],
-  ["agentic-search-specific", "recommended", "dev", "Developer resource discoverability", "agent-score", "put the product name in the titles of docs, OpenAPI and MCP pages and list them in llms.txt"],
+  ["cli-tool", "recommended", "dev", "CLI tool available", "api-surface", "publish a CLI on npm, PyPI or Homebrew and name the install command in llms.txt"],
+  ["onboarding-friction", "recommended", "dev", "Agent onboarding friction", "api-surface", "offer a free tier, self-serve API keys and a sandbox, and say so in llms.txt; one zero-auth endpoint proves it"],
+  ["agentic-search-specific", "recommended", "dev", "Developer resource discoverability", "api-surface", "put the product name in the titles of docs, OpenAPI and MCP pages and list them in llms.txt"],
 ];
 // Two checks run a web search for the brand. doors has no search engine it can name, so they read as unmeasured, sit outside our pool, and --reference shows theirs.
 const SEARCH = new Set(["brand-search-accuracy", "agentic-search-specific"]);
@@ -385,8 +385,10 @@ async function main() {
   if (CONTROL) return control();
   const origin = new URL(target).origin;
   const [m, ref] = await Promise.all([measure(origin), REFERENCE ? reference(origin) : null]);
-  const result = score(grade(m));
-  const out = { origin, measurable: m.homeOk || m.ladder.measurable === true, homeOk: m.homeOk, homeStatus: m.home.status || m.home.error, result, reference: ref, diff: ref && !ref.error ? diff(result, ref) : null, siblings: { ladderLevel: m.ladder.level ?? null, ladderError: m.ladder.error || null, bots: m.bots.instrument || m.bots.error || null, mcp: m.mcp.era || m.mcp.error || null } };
+  const graded = grade(m); const result = score(graded);
+  const out = { origin, measurable: m.homeOk || m.ladder.measurable === true, homeOk: m.homeOk, homeStatus: m.home.status || m.home.error, result, gates: graded.gates, reference: ref, diff: ref && !ref.error ? diff(result, ref) : null,
+    ladder: m.ladder.error ? { error: m.ladder.error } : { level: m.ladder.level, levelName: m.ladder.levelName, nextLevel: m.ladder.nextLevel || [], sells: m.ladder.sells, signals: m.ladder.signals || [], checks: m.ladder.checks, next: m.ladder.next },
+    siblings: { ladderLevel: m.ladder.level ?? null, ladderError: m.ladder.error || null, bots: m.bots.instrument || m.bots.error || null, mcp: m.mcp.era || m.mcp.error || null } };
   if (JSON_OUT) console.log(JSON.stringify(out, null, 2)); else print(out);
 }
 export { CHECKS, measure, grade, score, diff, print, fixture };
