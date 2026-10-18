@@ -42,15 +42,43 @@ Emit `resultType: "complete"` and `serverInfo` in `_meta` on every result
 unconditionally; JSON-RPC clients ignore unknown fields and modern clients
 read an absent `resultType` as complete anyway. One code path beats two.
 
+## Before you build: an MCP server is API evidence
+
+On is-agentic.com an answering `/mcp` turns on the API checks: OpenAPI
+published, scoped permissions and JSON error responses become Essentials
+(about 7 points each), plus a dozen Recommended rows. A site that adds MCP
+should build `api-surface` behind it; a content site that only wants
+isitagentready's level 4 gets there more cheaply with an Agent Skills index
+(`skills-index`), which is not API evidence.
+
+What earns the MCP rows once it exists: a public `tools/list` (an
+OAuth-challenged server earns five of six, "properly scoped"); the
+`resources` capability advertised only when `resources/list` returns something
+(allbirds.com, gymshark.com and saleor.io each lost an Essential to an empty
+list); and for an MCP App, a `ui://` view that reads as HTML with no login form
+and declares `_meta.ui.csp` with named `connectDomains` and `resourceDomains`.
+
 ## Cards and catalog
 
 Generate `server-card.json` and `agent-card.json` from the server's own tool
-registry and test them against `tools/list` in CI. Serve
+registry and test them against `tools/list` in CI. The server card carries
+`serverInfo` (name, version), the transport `endpoint` and the `capabilities`
+it serves (isitagentready's level-4 check reads exactly those). Serve
 `/.well-known/api-catalog` as `application/linkset+json` (RFC 9727) naming
 every machine door, and make the ROOT card describe the server at the root:
 the reference site's root card served its second server for weeks, and both
 the api-catalog and every probe pointed at that path. A card under a long
 `max-age` cannot be purged from clients, so move card meaning rarely.
+
+## WebMCP, for the page itself
+
+A browser agent can call the page's own actions instead of driving its UI. On
+load, feature-detect `document.modelContext` (older Chrome: `navigator.modelContext`)
+and `registerTool({ name, description, inputSchema, execute })` for each real
+action, with an `AbortController` signal to unregister. An existing `<form>`
+can expose itself declaratively with `toolname` and `tooldescription`, and
+`toolparamdescription` on its inputs. isitagentready detects it by loading the
+page in a browser; `agent-readiness` reads it statically and says `likely`.
 
 ## Annotations
 
